@@ -1,0 +1,137 @@
+city,parent_region,elevation,climate_zone,tourist_season,latitude,longitude,verified
+Gilgit,Gilgit-Baltistan,1465.0,subtropical,March-November,35.9208102,74.314044,True
+Skardu,Gilgit-Baltistan,2259.0,temperate,March-October,35.2863724,75.6400746,True
+Hunza,Gilgit-Baltistan,2033.0,temperate,March-October,36.2993187,74.613428,True
+Shigar,Gilgit-Baltistan,2223.0,temperate,March-October,35.4639544,75.6831923,True
+Ghizer,Gilgit-Baltistan,3586.0,alpine,June-September,36.3823847,73.8188899,True
+Astore,Gilgit-Baltistan,2429.0,temperate,March-October,35.3566152,74.8569804,True
+Khaplu,Gilgit-Baltistan,2511.0,alpine,June-September,35.1634994,76.3441519,True
+Karimabad,Gilgit-Baltistan,2394.0,temperate,March-October,36.3270559,74.6593357,True
+Gulmit,Gilgit-Baltistan,2496.0,temperate,March-October,36.3878939,74.862464,True
+Passu,Gilgit-Baltistan,2474.0,temperate,March-October,36.4658158,74.8943261,True
+Aliabad,Gilgit-Baltistan,2201.0,temperate,March-October,36.3059806,74.6166723,True
+Nagar,Gilgit-Baltistan,3805.0,alpine,June-September,36.3042502,74.26652,True
+Hussaini,Gilgit-Baltistan,5420.0,alpine,June-September,36.4163593,74.717978,True
+Altit,Gilgit-Baltistan,2391.0,temperate,March-October,36.3199273,74.6835167,True
+Duikar,Gilgit-Baltistan,2798.0,alpine,June-September,36.3257976,74.6909941,True
+Ganish,Gilgit-Baltistan,2138.0,temperate,March-October,36.3131445,74.6683879,True
+Borith,Gilgit-Baltistan,2645.0,alpine,June-September,36.4307737,74.8624024,True
+Gojal,Gilgit-Baltistan,2788.0,alpine,June-September,36.6176353,74.8632045,True
+Sost,Gilgit-Baltistan,2785.0,alpine,June-September,36.6897187,74.8205541,True
+Shigar Valley,Gilgit-Baltistan,2245.0,temperate,March-October,35.383117,75.7015818,True
+Khaplu Valley,Gilgit-Baltistan,2481.0,temperate,March-October,35.2247224,76.2419909,True
+Satpara Lake,Gilgit-Baltistan,2635.0,alpine,June-September,35.2285706,75.6299927,True
+Kachura Lake,Gilgit-Baltistan,2238.0,temperate,March-October,35.4266126,75.4552613,True
+Shangrila Resort,Gilgit-Baltistan,2240.0,temperate,March-October,35.4275657,75.45574,True
+Manthokha Waterfall,Gilgit-Baltistan,2415.0,temperate,March-October,35.0665332,75.9948129,True
+Rama Lake,Gilgit-Baltistan,3478.0,alpine,June-September,35.3302076,74.7859842,True
+Rupal Valley,Gilgit-Baltistan,3538.0,alpine,June-September,35.1908545,74.6187595,True
+Tarashing,Gilgit-Baltistan,3266.0,alpine,June-September,35.2553006,74.7070798,True
+Minimarg,Gilgit-Baltistan,2873.0,alpine,June-September,34.7915571,75.0796669,True
+Phandar Lake,Gilgit-Baltistan,2932.0,alpine,June-September,36.1706424,72.950984,True
+Yasin Valley,Gilgit-Baltistan,2631.0,alpine,June-September,36.5941038,73.4464164,True
+Darkut,Gilgit-Baltistan,2656.0,alpine,June-September,36.645692,73.4353263,True
+Gupis,Gilgit-Baltistan,2188.0,temperate,March-October,36.2287554,73.4478248,True
+Chatorkhand,Gilgit-Baltistan,2107.0,temperate,March-October,36.3471144,73.8466635,True
+Teru,Gilgit-Baltistan,3207.0,alpine,June-September,36.1807894,72.7665087,True
+Hispar,Gilgit-Baltistan,2508.0,alpine,June-September,36.2204007,74.8459992,True
+Minapin,Gilgit-Baltistan,2005.0,temperate,March-October,36.2523366,74.5358705,True
+Rakaposhi Base Camp,Gilgit-Baltistan,3448.0,alpine,June-September,36.1984884,74.5542848,True
+Fairy Meadows,Gilgit-Baltistan,3302.0,alpine,June-September,35.3872034,74.5789292,True
+Rush Lake,Gilgit-Baltistan,4611.0,alpine,June-September,36.1734436,74.8827575,True
+Naltar Lakes,Gilgit-Baltistan,1558.0,temperate,March-October,36.0747979,74.2911419,True
+Kutwal Lake,Gilgit-Baltistan,3315.0,alpine,June-September,35.8935468,74.8861983,True
+Attabad Lake,Gilgit-Baltistan,2399.0,temperate,March-October,36.3460111,74.8654715,True
+Borith Lake,Gilgit-Baltistan,2645.0,alpine,June-September,36.4307737,74.8624024,True
+Rush Peak,Gilgit-Baltistan,4909.0,alpine,June-September,36.1667057,74.9019003,True
+Chitral,KPK Highlands,1494.0,subtropical,March-November,35.850889,71.7901897,True
+Swat,KPK Highlands,363.0,warm,October-March,34.3192277,71.5902939,True
+Kalam,KPK Highlands,1984.0,temperate,March-October,35.4861081,72.5845788,True
+Malam Jabba,KPK Highlands,1029.0,subtropical,March-November,34.8197268,72.4736913,True
+Bahrain,KPK Highlands,29.0,warm,October-March,24.8846115,67.0523106,True
+Mingora,KPK Highlands,930.0,warm,October-March,34.7725375,72.3607712,True
+Dir,KPK Highlands,1402.0,subtropical,March-November,35.2080144,71.8779773,True
+Kumrat Valley,KPK Highlands,2367.0,temperate,March-October,35.5638686,72.1941226,True
+Mahodand Lake,KPK Highlands,2867.0,alpine,June-September,35.7082559,72.6534825,True
+Upper Chitral,KPK Highlands,2729.0,alpine,June-September,36.331791,72.2871568,True
+Lower Chitral,KPK Highlands,1475.0,subtropical,March-November,35.859597,71.7882218,True
+Garam Chashma,KPK Highlands,1969.0,temperate,March-October,36.0105355,71.6692676,True
+Bumburet,KPK Highlands,1658.0,temperate,March-October,35.7350212,71.7196332,True
+Rumbur,KPK Highlands,1727.0,temperate,March-October,35.7423048,71.7098736,True
+Birir,KPK Highlands,1781.0,temperate,March-October,35.6430982,71.7069458,True
+Mastuj,KPK Highlands,3348.0,alpine,June-September,36.7815834,73.0309178,True
+Booni,KPK Highlands,1979.0,temperate,March-October,36.2539218,72.222841,True
+Yarkhun Valley,KPK Highlands,2366.0,temperate,March-October,36.2771392,72.517129,True
+Kalash Valley,KPK Highlands,2032.0,temperate,March-October,35.7017945,71.6871085,True
+Ayun,KPK Highlands,1413.0,subtropical,March-November,35.7159081,71.77039,True
+Drosh,KPK Highlands,1336.0,subtropical,March-November,35.5616271,71.797564,True
+Madyan,KPK Highlands,1367.0,subtropical,March-November,35.1412913,72.5374404,True
+Mankial,KPK Highlands,1695.0,temperate,March-October,35.3273797,72.6132405,True
+Gabin Jabba,KPK Highlands,,unknown,All year,35.1697216,72.3814544,True
+Matiltan,KPK Highlands,2296.0,temperate,March-October,35.5414598,72.6612843,True
+Utror,KPK Highlands,2266.0,temperate,March-October,35.4915116,72.4690298,True
+Gabral,KPK Highlands,2313.0,temperate,March-October,35.5162991,72.4203822,True
+Marghazar,KPK Highlands,597.0,warm,October-March,33.7336355,73.0584456,True
+Miandam,KPK Highlands,1842.0,temperate,March-October,35.0533952,72.5605987,True
+Serai,KPK Highlands,913.0,warm,October-March,34.889981,72.7620833,True
+Fatehpur,KPK Highlands,233.0,warm,October-March,32.7875194,73.6335352,True
+Khwazakhela,KPK Highlands,1149.0,subtropical,March-November,34.9363193,72.4692872,True
+Upper Dir,KPK Highlands,2548.0,alpine,June-September,35.4050022,72.1144401,True
+Lower Dir,KPK Highlands,997.0,warm,October-March,34.8450852,71.8795222,True
+Kumrat,KPK Highlands,2367.0,temperate,March-October,35.5638686,72.1941226,True
+Jahaz Banda,KPK Highlands,3410.0,alpine,June-September,35.4039622,72.3179202,True
+Katora Lake,KPK Highlands,3538.0,alpine,June-September,35.3676374,72.3460934,True
+Sheringal,KPK Highlands,1429.0,subtropical,March-November,35.2764167,72.0023267,True
+Lowari Top,KPK Highlands,3166.0,alpine,June-September,35.3511292,71.8137225,True
+Daral Lake,KPK Highlands,3211.0,alpine,June-September,35.2170704,72.3751874,True
+Izmis Lake,KPK Highlands,3417.0,alpine,June-September,35.4002179,72.37722,True
+Bashigram Lake,KPK Highlands,3493.0,alpine,June-September,35.0830242,72.6659834,True
+Abbottabad,Hazara Division,1231.0,subtropical,March-November,34.1436136,73.2132747,True
+Mansehra,Hazara Division,1081.0,subtropical,March-November,34.3286855,73.1993125,True
+Naran,Hazara Division,902.0,warm,October-March,34.4761331,73.3474262,True
+Kaghan,Hazara Division,2081.0,temperate,March-October,34.7806262,73.5241551,True
+Shogran,Hazara Division,2355.0,temperate,March-October,34.6409377,73.463956,True
+Balakot,Hazara Division,995.0,warm,October-March,34.5506738,73.3525734,True
+Havelian,Hazara Division,849.0,warm,October-March,34.0519127,73.153453,True
+Garhi Habibullah,Hazara Division,808.0,warm,October-March,34.4006901,73.378452,True
+Oghi,Hazara Division,1126.0,subtropical,March-November,34.4973045,73.0160443,True
+Lulusar Lake,Hazara Division,3435.0,alpine,June-September,35.083601,73.9250006,True
+Lalazar,Hazara Division,1195.0,subtropical,March-November,34.17363,73.230474,True
+Batakundi,Hazara Division,2701.0,alpine,June-September,34.9305834,73.7774603,True
+Jalkhad,Hazara Division,3153.0,alpine,June-September,34.9997757,73.9372105,True
+Noori Top,Hazara Division,3920.0,alpine,June-September,34.9286551,74.061296,True
+Ansoo Lake,Hazara Division,4124.0,alpine,June-September,34.8141186,73.6764278,True
+Siri Paye,Hazara Division,225.0,warm,October-March,31.5852866,74.312541,True
+Makra Peak,Hazara Division,3741.0,alpine,June-September,34.5744295,73.4956545,True
+Musa ka Musalla,Hazara Division,4062.0,alpine,June-September,34.7154901,73.3610892,True
+Thandiani,Hazara Division,2685.0,alpine,June-September,34.2324289,73.3537965,True
+Galiyat,Hazara Division,9.0,warm,October-March,24.8288702,67.03369,True
+Shimla Hill,Hazara Division,216.0,warm,October-March,31.5626102,74.33527,True
+Kalabagh,Hazara Division,2394.0,temperate,March-October,34.0741433,73.3708487,True
+Nawanshehr,Hazara Division,1230.0,subtropical,March-November,34.1653662,73.26604,True
+Dhamtour,Hazara Division,1185.0,subtropical,March-November,34.1372359,73.2725057,True
+Sherwan,Hazara Division,1189.0,subtropical,March-November,34.2037569,73.0706726,True
+Kunhar River,Hazara Division,1601.0,temperate,March-October,34.7198359,73.5745229,True
+Paras,Hazara Division,1346.0,subtropical,March-November,34.6597225,73.4570696,True
+Mahandri,Hazara Division,1555.0,temperate,March-October,34.6971936,73.5776413,True
+Kawai,Hazara Division,1821.0,temperate,March-October,34.6337938,73.4501946,True
+Murree,Murree & Galyat,2146.0,temperate,March-October,33.9056829,73.392674,True
+Kashmir Point,Murree & Galyat,2213.0,temperate,March-October,33.9141273,73.4046674,True
+Pindi Point,Murree & Galyat,2170.0,temperate,March-October,33.8929056,73.3794159,True
+Mall Road Murree,Murree & Galyat,2146.0,temperate,March-October,33.9053497,73.3922004,True
+Patriata,Murree & Galyat,2155.0,temperate,March-October,33.8566737,73.4820028,True
+Bhurban,Murree & Galyat,1612.0,temperate,March-October,33.9873353,73.4698644,True
+Sunny Bank,Murree & Galyat,1986.0,temperate,March-October,33.9167593,73.3932872,True
+Murree Hills,Murree & Galyat,2122.0,temperate,March-October,33.8970451,73.382782,True
+Nathiagali,Murree & Galyat,2440.0,temperate,March-October,34.0717421,73.3910918,True
+Ayubia,Murree & Galyat,2651.0,alpine,June-September,34.0294561,73.3944016,True
+Changla Gali,Murree & Galyat,2447.0,temperate,March-October,33.9950951,73.3750512,True
+Khaira Gali,Murree & Galyat,2287.0,temperate,March-October,33.9829749,73.4001629,True
+Toheed Abad,Murree & Galyat,203.0,warm,October-March,31.2152231,74.0465253,True
+Pipeline Track,Murree & Galyat,2438.0,temperate,March-October,34.0402766,73.4033386,True
+Miranjani Peak,Murree & Galyat,2955.0,alpine,June-September,34.1050866,73.4072327,True
+Ayubia National Park,Murree & Galyat,2812.0,alpine,June-September,34.0609661,73.4294863,True
+Wild Life Park,Murree & Galyat,223.0,warm,October-March,32.2492244,74.1137718,True
+Lawrence College,Murree & Galyat,1910.0,temperate,March-October,33.8862683,73.3690379,True
+Ghora Gali,Murree & Galyat,1745.0,temperate,March-October,33.8822892,73.3609671,True
+Darya Gali,Murree & Galyat,1868.0,temperate,March-October,33.9475369,73.3953632,True
