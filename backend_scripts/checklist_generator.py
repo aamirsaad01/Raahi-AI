@@ -1,18 +1,50 @@
 import pandas as pd
 import json
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from datetime import datetime
 from typing import List, Dict, Optional
 import logging
+from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Load environment variables from repo root
+repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+env_path = os.path.join(repo_root, '.env')
+load_dotenv(dotenv_path=env_path)
+
 
 class ChecklistGenerator:
-    def __init__(self, location_csv_path='E:/Raahi-AI/backend_scripts/data/location_mapping.csv'):
-        """Initialize the checklist generator with location data"""
-        self.locations_df = pd.read_csv(location_csv_path)
+    def __init__(self, location_csv_path=None):
+        """
+        Initialize the checklist generator with location data from database
+        
+        Args:
+            location_csv_path: Deprecated - kept for backward compatibility but ignored.
+                              Data is now loaded from PostgreSQL database.
+        """
+        self.conn = self._connect_to_db()
         self.checklist_rules = self._initialize_rules()
+        logger.info("ChecklistGenerator initialized with database connection")
+    
+    def _connect_to_db(self):
+        """Connect to PostgreSQL database"""
+        try:
+            conn = psycopg2.connect(
+                dbname=os.getenv("DB_NAME", "raahi_ai"),
+                user=os.getenv("DB_USER", "postgres"),
+                password=os.getenv("DB_PASSWORD", ""),
+                host=os.getenv("DB_HOST", "127.0.0.1"),
+                port=os.getenv("DB_PORT", "5432"),
+            )
+            logger.info("Successfully connected to database")
+            return conn
+        except Exception as e:
+            logger.error(f"Failed to connect to database: {e}")
+            raise ConnectionError(f"Could not connect to database: {e}")
     
     def _initialize_rules(self) -> Dict:
         """Define packing rules based on various conditions"""
@@ -283,17 +315,56 @@ class ChecklistGenerator:
     
     def get_location_info(self, area_name: str, region_name: Optional[str] = None) -> Optional[Dict]:
         """Get location information from database"""
-        query = self.locations_df['city'].str.lower() == area_name.lower()
-        if region_name:
-            query = query & (self.locations_df['parent_region'] == region_name)
-        
-        result = self.locations_df[query]
-        
-        if result.empty:
-            logger.warning(f"Location '{area_name}' not found in database")
+        try:
+            cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+            
+            # Build query with optional region filter
+            if region_name:
+                query = """
+                    SELECT city, parent_region, elevation, climate_zone, 
+                           tourist_season, latitude, longitude, verified
+                    FROM location_mapping
+                    WHERE LOWER(city) = LOWER(%s) AND parent_region = %s
+                    LIMIT 1
+                """
+                cursor.execute(query, (area_name, region_name))
+            else:
+                query = """
+                    SELECT city, parent_region, elevation, climate_zone, 
+                           tourist_season, latitude, longitude, verified
+                    FROM location_mapping
+                    WHERE LOWER(city) = LOWER(%s)
+                    LIMIT 1
+                """
+                cursor.execute(query, (area_name,))
+            
+            result = cursor.fetchone()
+            cursor.close()
+            
+            if not result:
+                logger.warning(f"Location '{area_name}' not found in database")
+                return None
+            
+            # Convert RealDictRow to regular dict
+            return dict(result)
+            
+        except Exception as e:
+            logger.error(f"Error querying database: {e}")
             return None
-        
-        return result.iloc[0].to_dict()
+    
+    def close(self):
+        """Close the database connection"""
+        if self.conn:
+            self.conn.close()
+            logger.info("Database connection closed")
+    
+    def __enter__(self):
+        """Context manager entry"""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - automatically close connection"""
+        self.close()
     
     def generate_checklist(
         self,
@@ -446,60 +517,78 @@ def cli_test():
     print("🎒 RAAHI AI - Packing Checklist Generator")
     print("="*60)
     
-    generator = ChecklistGenerator('E:/Raahi-AI/backend_scripts/data/location_mapping.csv')
-    
-    # Get available regions
-    regions = generator.locations_df['parent_region'].unique()
-    print("\nAvailable Regions:")
-    for i, region in enumerate(regions, 1):
-        print(f"{i}. {region}")
-    
-    # Get user input
-    region_idx = int(input("\nSelect region (number): ")) - 1
-    selected_region = regions[region_idx]
-    
-    # Get areas in selected region
-    areas = generator.locations_df[
-        generator.locations_df['parent_region'] == selected_region
-    ]['city'].values
-    
-    print(f"\nAvailable areas in {selected_region}:")
-    for i, area in enumerate(areas[:20], 1):  # Show first 20
-        print(f"{i}. {area}")
-    if len(areas) > 20:
-        print(f"... and {len(areas) - 20} more")
-    
-    area_name = input("\nEnter area name: ")
-    
-    # Get month
-    month = int(input("Enter travel month (1-12): "))
-    
-    # Get activities
-    print("\nAvailable activities:")
-    activities_list = ["hiking", "skiing", "roadtrip", "city_tour", "camping", "photography", "cultural"]
-    for i, activity in enumerate(activities_list, 1):
-        print(f"{i}. {activity}")
-    
-    activity_input = input("\nSelect activities (comma-separated numbers, e.g., 1,3,6): ")
-    selected_activities = [activities_list[int(i)-1] for i in activity_input.split(',')]
-    
-    # Generate checklist
-    print("\n" + "="*60)
-    print("Generating your personalized checklist...")
-    print("="*60 + "\n")
-    
-    result = generator.generate_checklist(
-        area=area_name,
-        region=selected_region,
-        month=month,
-        activities=selected_activities
-    )
-    
-    if result.get("success"):
-        print_checklist(result)
-    else:
-        print(f"❌ Error: {result.get('error')}")
-        print(f"💡 {result.get('suggestion', '')}")
+    generator = None
+    try:
+        generator = ChecklistGenerator()
+        
+        # Get available regions from database
+        cursor = generator.conn.cursor()
+        cursor.execute("SELECT DISTINCT parent_region FROM location_mapping ORDER BY parent_region")
+        regions = [row[0] for row in cursor.fetchall()]
+        cursor.close()
+        
+        print("\nAvailable Regions:")
+        for i, region in enumerate(regions, 1):
+            print(f"{i}. {region}")
+        
+        # Get user input
+        region_idx = int(input("\nSelect region (number): ")) - 1
+        selected_region = regions[region_idx]
+        
+        # Get areas in selected region from database
+        cursor = generator.conn.cursor()
+        cursor.execute(
+            "SELECT city FROM location_mapping WHERE parent_region = %s ORDER BY city",
+            (selected_region,)
+        )
+        areas = [row[0] for row in cursor.fetchall()]
+        cursor.close()
+        
+        print(f"\nAvailable areas in {selected_region}:")
+        for i, area in enumerate(areas[:20], 1):  # Show first 20
+            print(f"{i}. {area}")
+        if len(areas) > 20:
+            print(f"... and {len(areas) - 20} more")
+        
+        area_name = input("\nEnter area name: ")
+        
+        # Get month
+        month = int(input("Enter travel month (1-12): "))
+        
+        # Get activities
+        print("\nAvailable activities:")
+        activities_list = ["hiking", "skiing", "roadtrip", "city_tour", "camping", "photography", "cultural"]
+        for i, activity in enumerate(activities_list, 1):
+            print(f"{i}. {activity}")
+        
+        activity_input = input("\nSelect activities (comma-separated numbers, e.g., 1,3,6): ")
+        selected_activities = [activities_list[int(i)-1] for i in activity_input.split(',')]
+        
+        # Generate checklist
+        print("\n" + "="*60)
+        print("Generating your personalized checklist...")
+        print("="*60 + "\n")
+        
+        result = generator.generate_checklist(
+            area=area_name,
+            region=selected_region,
+            month=month,
+            activities=selected_activities
+        )
+        
+        if result.get("success"):
+            print_checklist(result)
+        else:
+            print(f"❌ Error: {result.get('error')}")
+            print(f"💡 {result.get('suggestion', '')}")
+            
+    except Exception as e:
+        logger.error(f"Error in CLI: {e}")
+        print(f"❌ Error: {e}")
+    finally:
+        # Always close the connection
+        if generator:
+            generator.close()
 
 
 def print_checklist(checklist: Dict):
