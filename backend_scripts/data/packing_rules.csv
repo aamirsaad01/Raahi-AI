@@ -1,0 +1,46 @@
+region,season,activity,items
+
+# ---------- UNIVERSAL ESSENTIALS ----------
+,,,"CNIC;Mobile Phone;Charger;Power Bank;First Aid Kit;Prescription Medicines;Towel;Soap;Toothbrush;Snacks;Water Bottle;Cash;Sunscreen;Lip Balm;Raincoat;Torch;Lighter;Notebook;Pen;Portable Charger;Tissue Pack;Hand Sanitizer"
+
+# ---------- GILGIT–BALTISTAN ----------
+"Gilgit–Baltistan",winter,,"Thermal Jacket;Woolen Cap;Snow Boots;Gloves;Thermal Innerwear;Sweater;Moisturizer;Lip Balm;Snow Chains"
+"Gilgit–Baltistan",summer,,"Light Cotton Clothes;Cap;Sunscreen;Sunglasses;Comfortable Shoes;Insect Repellent"
+"Gilgit–Baltistan",,hiking,"Hiking Boots;Trekking Poles;Rain Jacket;Daypack;Compass;Trail Map;Energy Bars"
+"Gilgit–Baltistan",,camping,"Tent;Sleeping Bag;Camping Stove;Gas Cylinder;Cooking Pot;Lantern;Rope;Garbage Bags"
+"Gilgit–Baltistan",,road_trip,"Car Documents;Spare Tyre;Toolkit;Jumper Cables;Fuel Can;Navigation Map"
+"Gilgit–Baltistan",,photography,"Camera;Tripod;Extra Batteries;Memory Cards"
+"Gilgit–Baltistan",,sightseeing,"Cap;Guidebook;Water Bottle;Snacks;Sunscreen"
+
+# ---------- KPK HIGHLANDS ----------
+"KPK Highlands",winter,,"Jacket;Wool Socks;Snow Gloves;Thermal Innerwear;Lip Balm;Moisturizer"
+"KPK Highlands",summer,,"Cotton Shirts;Cap;Sunscreen;Sneakers;Mosquito Spray;Light Jacket"
+"KPK Highlands",,hiking,"Hiking Boots;Trekking Poles;Energy Bars;Trail Map;Waterproof Bag"
+"KPK Highlands",,camping,"Tent;Sleeping Bag;Cooking Kit;Rope;Lantern;Garbage Bags"
+"KPK Highlands",,road_trip,"Car Documents;Toolkit;Tyre Inflator;Snacks;Water Bottle"
+"KPK Highlands",,photography,"Camera;Drone;ND Filters;Tripod;Lens Cleaner"
+
+# ---------- HAZARA DIVISION / NARAN–KAGHAN BELT ----------
+"Hazara Division",winter,,"Thermal Jacket;Snow Gloves;Woolen Cap;Sweater;Lip Balm"
+"Hazara Division",summer,,"Cap;Light Clothes;Sneakers;Water Bottle;Umbrella;Sunscreen"
+"Hazara Division",,road_trip,"Car Documents;Spare Tyre;Navigation App;Snacks;Power Bank"
+"Hazara Division",,camping,"Tent;Sleeping Bag;Lantern;Cooking Pot;Garbage Bags"
+"Hazara Division",,hiking,"Raincoat;Trekking Poles;Energy Bars;Compass"
+"Hazara Division",,sightseeing,"Camera;Guidebook;Snacks;Portable Charger"
+
+# ---------- MURREE & GALYAT ----------
+"Murree & Galyat",winter,,"Thermal Jacket;Sweater;Warm Gloves;Beanie;Snow Boots;Moisturizer"
+"Murree & Galyat",summer,,"Light Jacket;Umbrella;Sneakers;Water Bottle;Cap"
+"Murree & Galyat",,sightseeing,"Camera;Power Bank;Snacks;Guidebook"
+"Murree & Galyat",,road_trip,"Car Toolkit;Navigation Map;Raincoat;Snacks"
+
+# ---------- ACTIVITY-SPECIFIC (GLOBAL RULES) ----------
+,,hiking,"Hiking Boots;Rain Jacket;Energy Bars;Compass;Sunscreen"
+,,camping,"Tent;Sleeping Bag;Cooking Kit;Flashlight;Garbage Bags;Rope"
+,,road_trip,"Car Documents;Spare Tyre;Fuel Can;Snacks;Navigation App"
+,,photography,"Camera;Tripod;Extra Battery;Memory Cards;Lens Cleaner"
+,,sightseeing,"Cap;Water Bottle;Comfortable Shoes;Guidebook;Camera"
+,,religious,"Prayer Mat;Rosary;Modest Clothes;Cap/Scarf;Hand Sanitizer"
+,,emergency,"First Aid Kit;Painkillers;Emergency Contact Card;Power Bank"
+,,winter,"Thermal Jacket;Sweater;Gloves;Wool Socks;Beanie"
+,,summer,"Cotton Clothes;Sunscreen;Cap;Water Bottle"
