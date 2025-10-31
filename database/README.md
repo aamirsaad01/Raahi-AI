@@ -33,9 +33,62 @@ This will create the following tables:
 |--------|----------|
 | `users` | Stores user registration data |
 | `itineraries` | Stores AI-generated or user-created travel plans |
-| `checklist` | Stores location-based packing items |
+| `checklist` | Stores location-based packing items (items stored as JSONB) |
+| `hazard_reports` | Stores user-reported safety hazards for locations |
 
-### 4️⃣ Test Connection with Python
+### 4️⃣ Environment Variables Setup
+1. Copy `.env.example` from the repository root to `.env` in the same location
+2. Fill in your local PostgreSQL credentials:
+```bash
+DB_NAME=raahi_ai
+DB_USER=postgres
+DB_PASSWORD=your_password_here
+DB_HOST=localhost
+DB_PORT=5432
+```
+
+### 5️⃣ Install Python Dependencies
+Install the required packages for database scripts:
+```bash
+pip install -r database/requirements.txt
+```
+
+### 6️⃣ Test Connection with Python
 Run this script:
 ```bash
 python database/postgresql/connection.py
+```
+
+Expected output:
+```
+✅ Connected to PostgreSQL successfully!
+📅 Server Time: [current timestamp]
+```
+
+### 7️⃣ Connection URL Format (for Backend Integration)
+When connecting from backend code (FastAPI, Django, etc.), use this format:
+```
+postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+```
+
+Example:
+```
+postgresql://postgres:your_password@localhost:5432/raahi_ai
+```
+
+---
+
+## 📋 Database Schema Summary
+
+### Tables & Relationships
+- **users** → **itineraries** (one-to-many)
+- **itineraries** → **checklist** (one-to-many)
+- **users** → **hazard_reports** (one-to-many, optional)
+- **itineraries** → **hazard_reports** (one-to-many, optional)
+
+### Key Features
+- ✅ Automatic timestamps (`created_at`, `updated_at`)
+- ✅ Foreign key constraints with cascade deletes
+- ✅ Indexes on frequently queried columns
+- ✅ JSONB support for flexible checklist items
+- ✅ Unique constraints (email, user+itinerary title)
