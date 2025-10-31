@@ -32,9 +32,9 @@ class HomePage extends StatelessWidget {
         route: AppRoutes.emergency,
       ),
       _HomeAction(
-        title: 'Group Chat',
-        icon: Icons.forum_rounded,
-        route: AppRoutes.groupChat,
+        title: 'Collaboration',
+        icon: Icons.groups_rounded,
+        route: AppRoutes.collaboration,
       ),
       _HomeAction(
         title: 'AI Chat (Urdu)',

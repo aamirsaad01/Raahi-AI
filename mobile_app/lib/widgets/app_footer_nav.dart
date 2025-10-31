@@ -45,9 +45,9 @@ class AppFooterNav extends StatelessWidget {
       ),
       _FooterItem(
         tab: FooterTab.chat,
-        icon: Icons.forum_rounded,
-        label: 'Group Chat',
-        route: AppRoutes.groupChat,
+        icon: Icons.groups_rounded,
+        label: 'Collaboration',
+        route: AppRoutes.collaboration,
       ),
       _FooterItem(
         tab: FooterTab.ai,
@@ -66,7 +66,11 @@ class AppFooterNav extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: items
-                .map(( _FooterItem item ) => _FooterButton(item: item, isActive: current == item.tab))
+                .map(( _FooterItem item ) => _FooterButton(
+                      item: item,
+                      isActive: current == item.tab,
+                      onTap: onTap, // pass parent onTap!
+                    ))
                 .toList(),
           ),
         ),
@@ -87,8 +91,9 @@ class _FooterItem {
 class _FooterButton extends StatelessWidget {
   final _FooterItem item;
   final bool isActive;
+  final void Function(FooterTab tab)? onTap; // add this field
 
-  const _FooterButton({required this.item, required this.isActive});
+  const _FooterButton({required this.item, required this.isActive, this.onTap}); // update constructor
 
   @override
   Widget build(BuildContext context) {
@@ -96,31 +101,28 @@ class _FooterButton extends StatelessWidget {
     final Color bg = isActive ? Colors.white : Colors.transparent;
     final Color fg = isActive ? colors.primary : Colors.white;
     return Expanded(
-      child: Tooltip(
-        message: item.label,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: () {
-            if (isActive) return;
-            if (onTap != null) {
-              onTap!(item.tab);
-              return;
-            }
-            if (item.tab == FooterTab.home) {
-              Navigator.of(context).pushNamedAndRemoveUntil(item.route, (Route<dynamic> r) => false);
-            } else {
-              Navigator.of(context).pushNamed(item.route);
-            }
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(item.icon, color: fg, size: 20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: () {
+          if (isActive) return;
+          if (onTap != null) {
+            onTap!(item.tab);
+            return;
+          }
+          if (item.tab == FooterTab.home) {
+            Navigator.of(context).pushNamedAndRemoveUntil(item.route, (Route<dynamic> r) => false);
+          } else {
+            Navigator.of(context).pushNamed(item.route);
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(24),
           ),
+          child: Icon(item.icon, color: fg, size: 20),
         ),
       ),
     );

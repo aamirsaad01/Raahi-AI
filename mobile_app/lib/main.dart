@@ -14,6 +14,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final FooterRouteObserver footerObserver = FooterRouteObserver();
+    final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
     return MaterialApp(
       title: 'Raahi AI',
       debugShowCheckedModeBanner: false,
@@ -22,6 +23,7 @@ class MyApp extends StatelessWidget {
       routes: AppRoutes.routes(),
       onGenerateRoute: AppRoutes.onGenerateRoute,
       initialRoute: AppRoutes.splash,
+      navigatorKey: navKey,
       navigatorObservers: <NavigatorObserver>[footerObserver],
       builder: (BuildContext context, Widget? child) {
         // Derive current tab from route name
@@ -48,12 +50,29 @@ class MyApp extends StatelessWidget {
                 active = FooterTab.hazards;
                 break;
               case AppRoutes.emergency:
+              case AppRoutes.emergencyDownloads:
+              case AppRoutes.emergencySafePoints:
+              case AppRoutes.emergencySosSetup:
+              case AppRoutes.emergencyOutbox:
+              case AppRoutes.emergencySettings:
                 active = FooterTab.emergency;
                 break;
-              case AppRoutes.groupChat:
+              case AppRoutes.collaboration:
+              case AppRoutes.collaborationCreate:
+              case AppRoutes.collaborationJoin:
+              case AppRoutes.collaborationChat:
+              case AppRoutes.collaborationMembers:
+              case AppRoutes.collaborationMap:
+              case AppRoutes.collaborationExpenses:
+              case AppRoutes.collaborationExpenseAdd:
+              case AppRoutes.collaborationPhotos:
+              case AppRoutes.collaborationPolls:
+              case AppRoutes.collaborationPollCreate:
                 active = FooterTab.chat;
                 break;
               case AppRoutes.aiChat:
+              case AppRoutes.aiChatHistory:
+              case AppRoutes.aiChatSettings:
                 active = FooterTab.ai;
                 break;
               case AppRoutes.home:
@@ -75,25 +94,25 @@ class MyApp extends StatelessWidget {
                         // Delegate to default navigation behavior
                         switch (tab) {
                           case FooterTab.home:
-                            Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.home, (Route<dynamic> r) => false);
+                            navKey.currentState?.pushNamedAndRemoveUntil(AppRoutes.home, (Route<dynamic> r) => false);
                             break;
                           case FooterTab.itinerary:
-                            Navigator.of(context).pushNamed(AppRoutes.itinerary);
+                            navKey.currentState?.pushNamed(AppRoutes.itinerary);
                             break;
                           case FooterTab.packing:
-                            Navigator.of(context).pushNamed(AppRoutes.packing);
+                            navKey.currentState?.pushNamed(AppRoutes.packing);
                             break;
                           case FooterTab.hazards:
-                            Navigator.of(context).pushNamed(AppRoutes.hazardMap);
+                            navKey.currentState?.pushNamed(AppRoutes.hazardMap);
                             break;
                           case FooterTab.emergency:
-                            Navigator.of(context).pushNamed(AppRoutes.emergency);
+                            navKey.currentState?.pushNamed(AppRoutes.emergency);
                             break;
                           case FooterTab.chat:
-                            Navigator.of(context).pushNamed(AppRoutes.groupChat);
+                            navKey.currentState?.pushNamed(AppRoutes.collaboration);
                             break;
                           case FooterTab.ai:
-                            Navigator.of(context).pushNamed(AppRoutes.aiChat);
+                            navKey.currentState?.pushNamed(AppRoutes.aiChat);
                             break;
                         }
                       },

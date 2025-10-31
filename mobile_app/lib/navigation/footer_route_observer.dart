@@ -4,7 +4,13 @@ class FooterRouteObserver extends NavigatorObserver {
   final ValueNotifier<String?> currentRouteName = ValueNotifier<String?>(null);
 
   void _update(Route<dynamic>? route) {
-    currentRouteName.value = route?.settings.name;
+    final String? name = route?.settings.name;
+    if (currentRouteName.value == name) return;
+    WidgetsBinding.instance.addPostFrameCallback((Duration _) {
+      if (currentRouteName.value != name) {
+        currentRouteName.value = name;
+      }
+    });
   }
 
   @override
