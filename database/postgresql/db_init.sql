@@ -92,11 +92,41 @@ CREATE TABLE IF NOT EXISTS hazard_reports (
     reported_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- LOCATION MAPPING TABLE
+CREATE TABLE IF NOT EXISTS location_mapping (
+    location_id SERIAL PRIMARY KEY,
+    city VARCHAR(100) NOT NULL UNIQUE,
+    parent_region VARCHAR(100) NOT NULL,
+    elevation NUMERIC(10,2),
+    climate_zone VARCHAR(50),
+    tourist_season VARCHAR(50),
+    latitude NUMERIC(10,8) NOT NULL,
+    longitude NUMERIC(11,8) NOT NULL,
+    verified BOOLEAN DEFAULT FALSE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'location_mapping_set_updated_at'
+    ) THEN
+        CREATE TRIGGER location_mapping_set_updated_at
+        BEFORE UPDATE ON location_mapping
+        FOR EACH ROW
+        EXECUTE FUNCTION set_updated_at();
+    END IF;
+END$$;
+
 -- INDEXES
 CREATE INDEX IF NOT EXISTS idx_itineraries_user_id ON itineraries(user_id);
 CREATE INDEX IF NOT EXISTS idx_checklist_itinerary_id ON checklist(itinerary_id);
 CREATE INDEX IF NOT EXISTS idx_hazard_reports_user_id ON hazard_reports(user_id);
 CREATE INDEX IF NOT EXISTS idx_hazard_reports_itinerary_id ON hazard_reports(itinerary_id);
+CREATE INDEX IF NOT EXISTS idx_location_mapping_parent_region ON location_mapping(parent_region);
+CREATE INDEX IF NOT EXISTS idx_location_mapping_verified ON location_mapping(verified);
+CREATE INDEX IF NOT EXISTS idx_location_mapping_climate_zone ON location_mapping(climate_zone);
 
 -- Avoid duplicate itinerary titles per user (optional but helpful)
 CREATE UNIQUE INDEX IF NOT EXISTS ux_itineraries_user_title ON itineraries(user_id, title);

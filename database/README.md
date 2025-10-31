@@ -35,6 +35,7 @@ This will create the following tables:
 | `itineraries` | Stores AI-generated or user-created travel plans |
 | `checklist` | Stores location-based packing items (items stored as JSONB) |
 | `hazard_reports` | Stores user-reported safety hazards for locations |
+| `location_mapping` | Stores city location data with coordinates, climate, and region info |
 
 ### 4️⃣ Environment Variables Setup
 1. Copy `.env.example` from the repository root to `.env` in the same location
