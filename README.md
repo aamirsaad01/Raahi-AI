@@ -21,7 +21,11 @@ Raahi-AI/
 
 ## 🚀 Quick Start
 
-### Backend Setup
+### For Frontend Developers (First Time Setup)
+
+**👉 Start here:** See [`FRONTEND_DEVELOPER_SETUP.md`](FRONTEND_DEVELOPER_SETUP.md) for complete step-by-step instructions.
+
+### Backend Setup (Quick Reference)
 
 1. **Database Setup:**
    - Install PostgreSQL
@@ -30,7 +34,7 @@ Raahi-AI/
    - Run: `database/postgresql/update_itinerary_schema.sql`
 
 2. **Environment Variables:**
-   - Copy `.env.example` to `.env`
+   - Create `.env` file in project root
    - Fill in database credentials
    - Add API keys (optional): `GEMINI_API_KEY`, `UNSPLASH_ACCESS_KEY`
 
@@ -82,6 +86,7 @@ flutter run
 
 ## 📚 Documentation
 
+- **⭐ Frontend Developer Setup:** [`FRONTEND_DEVELOPER_SETUP.md`](FRONTEND_DEVELOPER_SETUP.md) - **Start here if you're setting up for the first time!**
 - **Backend API:** `backend_scripts/api/API_DOCUMENTATION.md`
 - **Quick Start:** `backend_scripts/api/QUICK_START.md`
 - **Setup Guide:** `backend_scripts/api/SETUP_GUIDE.md`
