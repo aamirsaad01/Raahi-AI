@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_constants.dart';
 import 'models.dart';
 
 class CreatePollPage extends StatefulWidget {
@@ -26,8 +27,8 @@ class _CreatePollPageState extends State<CreatePollPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Create Poll')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0).add(AppConstants.footerPadding),
         child: Column(
           children: <Widget>[
             TextField(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/app_constants.dart';
 import 'models.dart';
 import '../../widgets/app_footer_nav.dart';
 
@@ -12,15 +13,21 @@ class PackingFormPage extends StatefulWidget {
 
 class _PackingFormPageState extends State<PackingFormPage> {
   Region? _region;
+  final TextEditingController _areaController = TextEditingController(); // NEW
   int? _month; // 1-12
   final Set<Activity> _activities = <Activity>{};
-  TravelerProfile _profile = TravelerProfile.standard;
+  // REMOVED: TravelerProfile _profile = TravelerProfile.standard;
+
+  @override
+  void dispose() {
+    _areaController.dispose(); // NEW: Dispose controller
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme colors = theme.colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Packing Checklist'),
@@ -35,7 +42,7 @@ class _PackingFormPageState extends State<PackingFormPage> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -50,6 +57,17 @@ class _PackingFormPageState extends State<PackingFormPage> {
                         onSelected: (_) => setState(() => _region = r),
                       ))
                   .toList(),
+            ),
+            const SizedBox(height: 16),
+            // NEW: Area input field
+            _SectionTitle('Area'),
+            TextField(
+              controller: _areaController,
+              decoration: const InputDecoration(
+                labelText: 'Enter area name',
+                hintText: 'e.g., Hunza, Skardu, Naran',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 16),
             _SectionTitle('Month'),
@@ -84,19 +102,7 @@ class _PackingFormPageState extends State<PackingFormPage> {
                       ))
                   .toList(),
             ),
-            const SizedBox(height: 16),
-            _SectionTitle('Traveler Profile'),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: TravelerProfile.values
-                  .map((TravelerProfile p) => ChoiceChip(
-                        label: Text(p.label),
-                        selected: _profile == p,
-                        onSelected: (_) => setState(() => _profile = p),
-                      ))
-                  .toList(),
-            ),
+            // REMOVED: Traveler Profile section entirely
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -107,9 +113,10 @@ class _PackingFormPageState extends State<PackingFormPage> {
                           AppRoutes.packingResults,
                           arguments: PackingFormData(
                             region: _region!,
+                            area: _areaController.text.trim(), // NEW
                             month: _month!,
                             activities: _activities.toList(),
-                            profile: _profile,
+                            // REMOVED: profile: _profile
                           ),
                         );
                       }
@@ -120,7 +127,7 @@ class _PackingFormPageState extends State<PackingFormPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Based on region, month, activities, and traveler needs',
+              'Based on region, area, month, and activities', // UPDATED text
               style: theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
             ),
           ],
@@ -129,7 +136,7 @@ class _PackingFormPageState extends State<PackingFormPage> {
     );
   }
 
-  bool get _canContinue => _region != null && _month != null;
+  bool get _canContinue => _region != null && _month != null && _areaController.text.trim().isNotEmpty; // UPDATED validation
 }
 
 class _SectionTitle extends StatelessWidget {

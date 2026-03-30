@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../features/home/home_page.dart';
 import '../features/itinerary/itinerary_page.dart';
+import '../features/itinerary/destination_selection_page.dart';
 import '../features/itinerary/results_page.dart';
 import '../features/itinerary/day_detail_page.dart';
 import '../features/itinerary/poi_detail_page.dart';
@@ -43,6 +44,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String splash = '/';
   static const String itinerary = '/itinerary';
+  static const String itineraryDestinationSelection = '/itinerary/destinations';
   static const String itineraryResults = '/itinerary/results';
   static const String itineraryDay = '/itinerary/day';
   static const String itineraryPoi = '/itinerary/poi';
@@ -81,6 +83,10 @@ class AppRoutes {
       splash: (BuildContext context) => const SplashPage(),
       home: (BuildContext context) => const HomePage(),
       itinerary: (BuildContext context) => const ItineraryFormPage(),
+      itineraryDestinationSelection: (BuildContext context) {
+        final Object? args = ModalRoute.of(context)?.settings.arguments;
+        return DestinationSelectionPage(form: args as ItineraryFormData);
+      },
       itineraryResults: (BuildContext context) {
         final Object? args = ModalRoute.of(context)?.settings.arguments;
         return ItineraryResultsPage(form: args as ItineraryFormData);

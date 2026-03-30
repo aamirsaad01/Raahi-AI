@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
-import '../../widgets/app_footer_nav.dart';
 
 class RoutesMapPage extends StatelessWidget {
   final TripItinerary itinerary;

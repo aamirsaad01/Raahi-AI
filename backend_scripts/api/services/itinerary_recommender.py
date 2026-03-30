@@ -30,7 +30,8 @@ class ItineraryRecommender:
         activities: List[str] = None,
         days: int = 3,
         travel_month: int = 5,
-        num_recommendations: int = 5
+        num_recommendations: int = 5,
+        num_people: int = 1
     ) -> Dict:
         """
         Recommend multiple destination options
@@ -70,13 +71,17 @@ class ItineraryRecommender:
                 if not pois:
                     continue
                 
-                # Calculate user preferences dict
+                # Intelligent budget division: divide total budget by num_people for per-person calculations
+                per_person_budget = budget / num_people
+                
+                # Calculate user preferences dict (use per-person budget for matching)
                 user_prefs = {
-                    'budget': budget,
+                    'budget': per_person_budget,
                     'mood': mood,
                     'activities': activities or [],
                     'days': days,
-                    'travel_month': travel_month
+                    'travel_month': travel_month,
+                    'num_people': num_people
                 }
                 
                 # Filter and rank POIs
@@ -85,31 +90,32 @@ class ItineraryRecommender:
                 if not ranked_pois:
                     continue
                 
-                # Select POIs within budget
+                # Select POIs within budget (using per-person budget)
                 selected_pois = self.matcher.select_pois_within_budget(
                     ranked_pois,
-                    budget,
+                    per_person_budget,
                     days
                 )
                 
                 if not selected_pois:
                     continue
                 
-                # Calculate location score
+                # Calculate location score (using per-person budget)
                 location_score = self._calculate_location_score(
                     location,
                     selected_pois,
-                    budget,
+                    per_person_budget,
                     days,
                     travel_month
                 )
                 
-                # Get preview data
+                # Get preview data (using total budget for display, but calculations use per-person)
                 preview = self._create_preview(
                     location,
                     selected_pois,
                     budget,
-                    days
+                    days,
+                    num_people
                 )
                 
                 scored_locations.append({
@@ -239,7 +245,8 @@ class ItineraryRecommender:
         location: Dict,
         pois: List[Dict],
         budget: float,
-        days: int
+        days: int,
+        num_people: int = 1
     ) -> Dict:
         """
         Create preview/summary for a destination
@@ -253,12 +260,17 @@ class ItineraryRecommender:
         Returns:
             Preview dictionary
         """
-        # Calculate costs
-        total_poi_cost = sum(poi.get('estimated_cost_pkr_max', 0) for poi in pois)
+        # Calculate costs (scale POI costs by num_people, as entry fees are per person)
+        per_person_poi_cost = sum(poi.get('estimated_cost_pkr_max', 0) for poi in pois)
+        total_poi_cost = per_person_poi_cost * num_people
         
-        accommodation_cost = (budget * 0.40)
-        food_cost = (budget * 0.20)
-        transport_cost = (budget * 0.10)
+        # Accommodation: may not scale linearly, but for simplicity scale it
+        # Food: scales linearly with num_people
+        # Transport: may not scale linearly, but for simplicity scale it
+        per_person_budget = budget / num_people
+        accommodation_cost = (per_person_budget * 0.40) * num_people
+        food_cost = (per_person_budget * 0.20) * num_people
+        transport_cost = (per_person_budget * 0.10) * num_people
         
         total_estimated = total_poi_cost + accommodation_cost + food_cost + transport_cost
         

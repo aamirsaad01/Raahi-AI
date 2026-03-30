@@ -98,6 +98,14 @@ def recommend_destinations():
         travel_month = data.get('travel_month', 5)
         num_recommendations = data.get('num_recommendations', 5)
         activities = data.get('activities', [])
+        num_people = data.get('num_people', 1)  # Default to 1 person
+        
+        # Validate num_people
+        if not isinstance(num_people, int) or num_people < 1:
+            return jsonify({
+                'success': False,
+                'error': 'Number of people must be a positive integer'
+            }), 400
         
         # Generate recommendations
         recommender = ItineraryRecommender()
@@ -107,7 +115,8 @@ def recommend_destinations():
             activities=activities,
             days=days,
             travel_month=travel_month,
-            num_recommendations=num_recommendations
+            num_recommendations=num_recommendations,
+            num_people=num_people
         )
         recommender.close()
         
@@ -132,7 +141,7 @@ def generate_itinerary():
     
     Request Body:
     {
-        "user_id": 1,
+        "user_id": 1,  (optional, defaults to 0 for anonymous users)
         "destination": "Hunza",
         "days": 3,
         "budget": 50000,
@@ -154,14 +163,18 @@ def generate_itinerary():
     try:
         data = request.get_json()
         
-        # Validate required fields
-        required_fields = ['user_id', 'destination', 'days', 'budget']
+        # Validate required fields (user_id is optional)
+        required_fields = ['destination', 'days', 'budget']
         for field in required_fields:
             if field not in data:
                 return jsonify({
                     'success': False,
                     'error': f'Missing required field: {field}'
                 }), 400
+        
+        # user_id is optional - if not provided or 0, will be set to None (anonymous user)
+        if 'user_id' not in data or data.get('user_id') is None or data.get('user_id') == 0:
+            data['user_id'] = None
         
         # Validate data types
         if not isinstance(data['days'], int) or data['days'] <= 0:
@@ -183,6 +196,15 @@ def generate_itinerary():
             data['activities'] = []
         if 'travel_month' not in data:
             data['travel_month'] = 5  # Default to May
+        if 'num_people' not in data:
+            data['num_people'] = 1  # Default to 1 person
+        
+        # Validate num_people
+        if not isinstance(data['num_people'], int) or data['num_people'] < 1:
+            return jsonify({
+                'success': False,
+                'error': 'Number of people must be a positive integer'
+            }), 400
         
         # Generate itinerary
         generator = ItineraryGenerator()

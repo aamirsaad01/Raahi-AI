@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_constants.dart';
 
 class EmergencySettingsPage extends StatefulWidget {
   const EmergencySettingsPage({super.key});
@@ -17,6 +18,7 @@ class _EmergencySettingsPageState extends State<EmergencySettingsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Emergency Settings')),
       body: ListView(
+        padding: AppConstants.footerPadding,
         children: <Widget>[
           SwitchListTile(
             value: autoSwitch,

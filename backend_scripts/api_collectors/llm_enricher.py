@@ -1,10 +1,10 @@
 """
 LLM POI Enricher
-Uses Google Gemini (FREE) to generate rich metadata for POIs
+Uses Ollama (local, unlimited) to generate rich metadata for POIs
 Fills in: descriptions, ratings, mood tags, costs, difficulty, etc.
 """
 
-import google.generativeai as genai
+import requests
 import json
 import os
 import logging
@@ -20,31 +20,40 @@ logger = logging.getLogger(__name__)
 
 class POIEnricher:
     """
-    Enriches POI data using LLM (Google Gemini)
+    Enriches POI data using LLM (Ollama - local, unlimited)
     Generates descriptions, ratings, costs, and custom metadata
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, base_url: Optional[str] = None, model: Optional[str] = None):
         """
         Initialize LLM enricher
         
         Args:
-            api_key: Gemini API key (optional, reads from env if not provided)
+            base_url: Ollama API base URL (default: http://localhost:11434)
+            model: Model name to use (default: llama3.2)
         """
-        api_key = api_key or os.getenv('GEMINI_API_KEY')
+        self.base_url = base_url or os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
+        self.model = model or os.getenv('OLLAMA_MODEL', 'llama3.2:latest')
         
-        if not api_key:
-            raise ValueError(
-                "Gemini API key not found! "
-                "Set GEMINI_API_KEY in .env file or pass it as argument"
-            )
-        
+        # Test connection
         try:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
-            logger.info("✅ LLM Enricher initialized with Gemini")
+            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
+            if response.status_code == 200:
+                available_models = [m['name'] for m in response.json().get('models', [])]
+                if self.model not in available_models:
+                    logger.warning(f"⚠️ Model '{self.model}' not found. Available models: {available_models}")
+                    logger.warning(f"⚠️ Attempting to use '{self.model}' anyway. Make sure it's installed with: ollama pull {self.model}")
+                logger.info(f"✅ LLM Enricher initialized with Ollama (model: {self.model})")
+            else:
+                raise ConnectionError(f"Ollama API returned status {response.status_code}")
+        except requests.exceptions.ConnectionError:
+            raise ConnectionError(
+                f"❌ Cannot connect to Ollama at {self.base_url}. "
+                "Make sure Ollama is running. Install from: https://ollama.com\n"
+                f"Then run: ollama pull {self.model}"
+            )
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Gemini: {e}")
+            logger.error(f"❌ Failed to initialize Ollama: {e}")
             raise
     
     def enrich_poi(self, poi_data: Dict) -> Dict:
@@ -71,16 +80,89 @@ class POIEnricher:
         try:
             logger.info(f"🤖 Enriching: {poi_name} in {location}")
             
-            response = self.model.generate_content(prompt)
+            # Request JSON response format for better parsing
+            # Add explicit instruction for JSON output in prompt
+            system_prompt = "You are a Pakistani tourism expert. Always respond with valid JSON only, no markdown formatting, no code blocks."
+            json_prompt = prompt + "\n\nIMPORTANT: Return ONLY valid JSON, no markdown code blocks, no explanatory text. Start directly with { and end with }."
+            
+            # Ollama API call (streaming response)
+            response = requests.post(
+                f"{self.base_url}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": system_prompt
+                        },
+                        {
+                            "role": "user",
+                            "content": json_prompt
+                        }
+                    ],
+                    "options": {
+                        "temperature": 0.1,  # Lower temperature for more consistent output
+                    },
+                    "format": "json",  # Request JSON format
+                    "stream": False  # Disable streaming for simpler parsing
+                },
+                timeout=120  # Ollama can be slower, allow 2 minutes
+            )
+            
+            if response.status_code != 200:
+                raise Exception(f"Ollama API error: {response.status_code} - {response.text}")
+            
+            # Parse response - Ollama may return streaming format (multiple JSON lines)
+            response_text = ""
+            response_text_raw = response.text
+            
+            # Try to parse as single JSON first
+            try:
+                response_data = json.loads(response_text_raw)
+                response_text = response_data.get('message', {}).get('content', '')
+            except json.JSONDecodeError:
+                # If that fails, it's likely streaming format (multiple JSON objects, one per line)
+                logger.debug("Parsing streaming response format")
+                lines = response_text_raw.strip().split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                        if 'message' in chunk and 'content' in chunk.get('message', {}):
+                            response_text += chunk['message']['content']
+                        elif 'content' in chunk:
+                            # Sometimes content is directly in chunk
+                            response_text += chunk.get('content', '')
+                    except json.JSONDecodeError:
+                        # Skip invalid JSON lines
+                        continue
+                
+                if not response_text:
+                    logger.error(f"Could not extract content. Raw response (first 1000 chars):\n{response_text_raw[:1000]}")
+                    raise Exception(f"Could not extract content from Ollama streaming response")
+            
+            if not response_text:
+                raise Exception("Empty response from Ollama")
+            
+            # Log raw response for debugging
+            logger.info(f"📝 Raw Ollama response (first 800 chars):\n{response_text[:800]}")
             
             # Clean and parse response
-            enriched_data = self._parse_llm_response(response.text)
+            enriched_data = self._parse_llm_response(response_text)
             
             logger.info(f"✅ Enriched: {poi_name}")
             return enriched_data
             
         except json.JSONDecodeError as e:
             logger.warning(f"⚠️ JSON parse error for {poi_name}: {e}")
+            # Try to get response_text from the exception context
+            try:
+                response_text = response.text if 'response' in locals() else "Could not retrieve response"
+                logger.warning(f"📝 Full response text:\n{response_text[:2000]}")
+            except:
+                pass
             return self._default_enrichment(poi_name, category)
         except Exception as e:
             logger.error(f"❌ LLM error for {poi_name}: {e}")
@@ -187,13 +269,14 @@ Analyze this location and provide comprehensive, accurate tourism data.
 - Return ONLY valid JSON, no markdown formatting, no explanatory text
 - Be realistic about costs, accessibility, and ratings
 - Consider the region's infrastructure and tourism development level
+- Do NOT include comments (//) in the JSON output - only valid JSON syntax
 """
         
         return prompt
     
     def _parse_llm_response(self, response_text: str) -> Dict:
         """
-        Parse LLM response, handling markdown formatting
+        Parse LLM response, handling markdown formatting and extra text
         
         Args:
             response_text: Raw LLM output
@@ -214,8 +297,68 @@ Analyze this location and provide comprehensive, accurate tourism data.
         
         text = text.strip()
         
-        # Parse JSON
-        return json.loads(text)
+        # Try to parse directly first (in case it's clean JSON)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            # If direct parse fails, extract JSON object
+            pass
+        
+        # Extract JSON object if there's extra text
+        # Find the first { and last } to extract just the JSON
+        first_brace = text.find('{')
+        if first_brace == -1:
+            raise json.JSONDecodeError("No JSON object found", text, 0)
+        
+        # Find the matching closing brace (handle nested objects and strings)
+        brace_count = 0
+        last_brace = -1
+        in_string = False
+        escape_next = False
+        
+        for i in range(first_brace, len(text)):
+            char = text[i]
+            
+            if escape_next:
+                escape_next = False
+                continue
+            
+            if char == '\\':
+                escape_next = True
+                continue
+            
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+            
+            if not in_string:
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        last_brace = i
+                        break
+        
+        if last_brace == -1:
+            # No matching closing brace, try parsing from first brace to end
+            logger.warning("⚠️ Could not find matching closing brace, attempting to parse from first brace")
+            json_text = text[first_brace:]
+        else:
+            # Extract just the JSON part
+            json_text = text[first_brace:last_brace + 1]
+        
+        # Try to parse the extracted JSON
+        try:
+            parsed = json.loads(json_text)
+            logger.debug(f"✅ Successfully parsed JSON (extracted {len(json_text)} chars)")
+            return parsed
+        except json.JSONDecodeError as e:
+            # Log the problematic text for debugging
+            logger.error(f"❌ JSON parse error at position {e.pos}")
+            logger.error(f"Extracted JSON text (first 1000 chars):\n{json_text[:1000]}")
+            logger.error(f"Full response text (first 1000 chars):\n{text[:1000]}")
+            raise
     
     def _default_enrichment(self, poi_name: str, category: str) -> Dict:
         """
@@ -318,11 +461,13 @@ def test_llm_enricher():
         for highlight in result['highlights']:
             print(f"  • {highlight}")
         
-    except ValueError as e:
+    except (ValueError, ConnectionError) as e:
         print(f"\n❌ Error: {e}")
         print("\n💡 To test this, you need to:")
-        print("1. Get a free Gemini API key from: https://makersuite.google.com/app/apikey")
-        print("2. Add it to your .env file: GEMINI_API_KEY=your_key_here")
+        print("1. Install Ollama from: https://ollama.com")
+        print("2. Pull the model: ollama pull llama3.2")
+        print("3. Make sure Ollama is running (it starts automatically)")
+        print("4. Optional: Set OLLAMA_BASE_URL and OLLAMA_MODEL in .env file")
 
 
 if __name__ == "__main__":

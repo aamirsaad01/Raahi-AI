@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/app_constants.dart';
 import 'models.dart';
 
 class ExpensesPage extends StatelessWidget {
@@ -37,7 +38,7 @@ class ExpensesPage extends StatelessWidget {
         children: <Widget>[
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
               itemCount: expenses.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (BuildContext context, int i) {

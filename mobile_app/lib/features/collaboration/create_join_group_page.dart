@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/app_constants.dart';
 import 'models.dart';
 
 class CreateJoinGroupPage extends StatefulWidget {
@@ -27,8 +28,8 @@ class _CreateJoinGroupPageState extends State<CreateJoinGroupPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.isCreating ? 'Create Group' : 'Join Group')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0).add(AppConstants.footerPadding),
         child: Column(
           children: <Widget>[
             if (widget.isCreating) ...<Widget>[

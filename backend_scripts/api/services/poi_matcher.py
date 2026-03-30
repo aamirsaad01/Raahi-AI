@@ -176,6 +176,7 @@ class POIMatcher:
     ) -> List[Dict]:
         """
         Select POIs that fit within budget
+        Solution 1: Ensures minimum 1 POI per day
         
         Args:
             pois: Ranked list of POIs
@@ -200,9 +201,22 @@ class POIMatcher:
         selected = []
         cost_so_far = 0
         
+        # Solution 1: Minimum POIs per day - ensure at least num_days POIs
+        min_pois_needed = num_days  # At least 1 POI per day
+        
         for poi in pois:
             poi_cost = float(poi.get('estimated_cost_pkr_max', 0))
             
+            # If we haven't reached minimum, prioritize getting at least 1 per day
+            # even if it slightly exceeds budget
+            if len(selected) < min_pois_needed:
+                # For minimum POIs, allow slight budget flexibility (up to 120% of budget)
+                if cost_so_far + poi_cost <= poi_budget * 1.2:
+                    selected.append(poi)
+                    cost_so_far += poi_cost
+                    continue
+            
+            # After minimum is met, stick to budget strictly
             if cost_so_far + poi_cost <= poi_budget:
                 selected.append(poi)
                 cost_so_far += poi_cost

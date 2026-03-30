@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
 import '../../routes/app_routes.dart';
-import '../../widgets/app_footer_nav.dart';
+import '../../utils/app_constants.dart';
 
 class DayDetailPage extends StatelessWidget {
   final DayPlan day;
@@ -12,6 +12,7 @@ class DayDetailPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text('Day ${day.dayNumber}')),
       body: ListView(
+        padding: AppConstants.footerPadding,
         children: <Widget>[
           ...day.stops.map((Poi p) => ListTile(
                 title: Text(p.name),

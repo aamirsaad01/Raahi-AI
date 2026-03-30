@@ -30,4 +30,3 @@ BEGIN
     RAISE NOTICE '✅ Itinerary table updated successfully!';
     RAISE NOTICE '📊 New columns added: daily_plan, total_cost, mood_tags, activities, travel_month';
 END $$;
-

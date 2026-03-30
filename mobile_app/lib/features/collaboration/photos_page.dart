@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_constants.dart';
 
 class PhotosPage extends StatelessWidget {
   const PhotosPage({super.key});
@@ -20,7 +21,7 @@ class PhotosPage extends StatelessWidget {
         ],
       ),
       body: GridView.builder(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(8).add(AppConstants.footerPadding),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
           crossAxisSpacing: 4,

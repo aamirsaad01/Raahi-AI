@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/app_constants.dart';
 import 'models.dart';
 
 class GroupsListPage extends StatelessWidget {
@@ -28,7 +29,7 @@ class GroupsListPage extends StatelessWidget {
         ),
       ),
       body: ListView.separated(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
         itemCount: groups.length + 1,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (BuildContext context, int i) {

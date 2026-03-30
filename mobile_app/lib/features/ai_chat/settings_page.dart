@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_constants.dart';
 import 'models.dart';
 
 class AiChatSettingsPage extends StatefulWidget {
@@ -19,7 +20,7 @@ class _AiChatSettingsPageState extends State<AiChatSettingsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Chat Settings')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
         children: <Widget>[
           Text('Language Preference', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),

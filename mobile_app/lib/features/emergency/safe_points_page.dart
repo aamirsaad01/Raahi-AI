@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_constants.dart';
 
 class SafePointsPage extends StatelessWidget {
   const SafePointsPage({super.key});
@@ -13,6 +14,7 @@ class SafePointsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Safe Points')),
       body: ListView.builder(
+        padding: AppConstants.footerPadding,
         itemCount: pois.length,
         itemBuilder: (BuildContext context, int i) {
           final Map<String, String> p = pois[i];

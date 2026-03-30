@@ -1,20 +1,16 @@
-enum Region { north, central, south, coastal, desert, highlands }
+enum Region { gilgit, kpk, hazara, murree}
 
 extension RegionLabel on Region {
   String get label {
     switch (this) {
-      case Region.north:
-        return 'North';
-      case Region.central:
-        return 'Central';
-      case Region.south:
-        return 'South';
-      case Region.coastal:
-        return 'Coastal';
-      case Region.desert:
-        return 'Desert';
-      case Region.highlands:
-        return 'Highlands';
+      case Region.gilgit:
+        return 'Gilgit-Baltistan';
+      case Region.kpk:
+        return 'KPK Highlands';
+      case Region.hazara:
+        return 'Hazara Division';
+      case Region.murree:
+        return 'Murree & Galyat	';
     }
   }
 }
@@ -40,6 +36,26 @@ extension ActivityLabel on Activity {
         return 'Skiing';
     }
   }
+
+  // ADD THIS METHOD - Convert to backend format
+  String get backendValue {
+    switch (this) {
+      case Activity.hiking:
+        return 'hiking';
+      case Activity.roadTrip:
+        return 'roadtrip';
+      case Activity.cityTour:
+        return 'city_tour';
+      case Activity.camping:
+        return 'camping';
+      case Activity.photography:
+        return 'photography';
+      case Activity.cultural:
+        return 'cultural';
+      case Activity.skiing:
+        return 'skiing';
+    }
+  }
 }
 
 enum TravelerProfile { standard, withKids, elderly, medicalNeeds }
@@ -61,15 +77,16 @@ extension TravelerProfileLabel on TravelerProfile {
 
 class PackingFormData {
   final Region region;
+  final String area; // NEW: Added area field
   final int month;
   final List<Activity> activities;
-  final TravelerProfile profile;
+  // REMOVED: TravelerProfile profile
 
   const PackingFormData({
     required this.region,
+    required this.area, // NEW
     required this.month,
-    required this.activities,
-    required this.profile,
+    required this.activities
   });
 }
 
@@ -87,6 +104,17 @@ class PackingItem {
     this.quantity = 1,
     this.checked = false,
   });
+
+  // ADD THIS METHOD
+  factory PackingItem.fromJson(Map<String, dynamic> json) {
+    return PackingItem(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      notes: json['notes'],
+      quantity: json['quantity'] ?? 1,
+      checked: json['checked'] ?? false,
+    );
+  }
 
   PackingItem copyWith({
     String? id,
@@ -110,6 +138,17 @@ class PackingSection {
   final List<PackingItem> items;
 
   const PackingSection({required this.title, required this.items});
+
+  // ADD THIS METHOD
+  factory PackingSection.fromJson(Map<String, dynamic> json) {
+    return PackingSection(
+      title: json['title'] ?? '',
+      items: (json['items'] as List<dynamic>?)
+              ?.map((item) => PackingItem.fromJson(item))
+              .toList() ??
+          [],
+    );
+  }
 }
 
 String monthName(int m) {

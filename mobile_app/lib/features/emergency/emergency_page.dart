@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/app_constants.dart';
 import '../../widgets/app_footer_nav.dart';
 
 class EmergencyPage extends StatelessWidget {
@@ -19,6 +20,7 @@ class EmergencyPage extends StatelessWidget {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: GridView.builder(
+          padding: AppConstants.footerPadding,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: 12,

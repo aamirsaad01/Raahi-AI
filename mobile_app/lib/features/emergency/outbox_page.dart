@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_constants.dart';
 
 class EmergencyOutboxPage extends StatelessWidget {
   const EmergencyOutboxPage({super.key});
@@ -12,6 +13,7 @@ class EmergencyOutboxPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Queued Messages')),
       body: ListView.separated(
+        padding: AppConstants.footerPadding,
         itemCount: queue.length,
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (BuildContext context, int i) {

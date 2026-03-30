@@ -37,6 +37,19 @@ This will create the following tables:
 | `hazard_reports` | Stores user-reported safety hazards for locations |
 | `location_mapping` | Stores city location data with coordinates, climate, and region info |
 
+### 3️⃣ (Optional) Add NDMA Alerts Table
+
+To enable the NDMA hazard alert system, run the additional migration:
+
+In pgAdmin:
+- Open **Query Tool**
+- Copy & paste contents of `database/postgresql/add_ndma_alerts_table.sql`
+- Click **Execute (▶)**
+
+This creates the `ndma_alerts` table for storing scraped disaster advisories from NDMA Pakistan.
+
+See `backend_scripts/NDMA_POLLER_README.md` for details on the poller service.
+
 ### 4️⃣ Environment Variables Setup
 1. Copy `.env.example` from the repository root to `.env` in the same location
 2. Fill in your local PostgreSQL credentials:
@@ -86,6 +99,7 @@ postgresql://postgres:your_password@localhost:5432/raahi_ai
 - **itineraries** → **checklist** (one-to-many)
 - **users** → **hazard_reports** (one-to-many, optional)
 - **itineraries** → **hazard_reports** (one-to-many, optional)
+- **ndma_alerts** (standalone) - Scraped disaster advisories from NDMA Pakistan
 
 ### Key Features
 - ✅ Automatic timestamps (`created_at`, `updated_at`)

@@ -147,19 +147,59 @@ class POIPipeline:
                 try:
                     logger.info(f"\n   [{poi_idx}/{len(osm_pois)}] Processing: {poi['name']}")
                     
-                    # Enrich with LLM
-                    enriched = self.enricher.enrich_poi(poi)
+                    # Check if POI already exists for this specific location
+                    existing_poi_for_location = self._check_poi_exists_for_location(poi['osm_id'], loc_id)
                     
-                    # Fetch photos (if available)
-                    photos = []
-                    if self.photo_fetcher.access_key:
-                        photos = self.photo_fetcher.fetch_photos(poi['name'], city, max_photos=3)
-                        if not photos:
-                            # Try fallback generic photos
-                            photos = self.photo_fetcher.fetch_fallback_photos(
-                                enriched.get('category', 'nature'),
-                                region
-                            )
+                    if existing_poi_for_location:
+                        # POI already exists for this location - skip (no need to re-save)
+                        logger.info(f"   ℹ️  POI already exists for this location, skipping")
+                        total_pois += 1
+                        continue
+                    
+                    # Check if POI exists in any other location (to reuse enrichment data)
+                    existing_poi_anywhere = self._get_existing_poi_anywhere(poi['osm_id'])
+                    
+                    if existing_poi_anywhere:
+                        # POI exists in another location - reuse enrichment data, create new entry for this location
+                        logger.info(f"   ℹ️  POI exists in another location, reusing enrichment data (skipping LLM)")
+                        
+                        # Use existing enriched data
+                        enriched = {
+                            'description': existing_poi_anywhere.get('description', ''),
+                            'estimated_rating': float(existing_poi_anywhere.get('rating', 4.0)),
+                            'category': existing_poi_anywhere.get('category', 'nature'),
+                            'difficulty': existing_poi_anywhere.get('difficulty', 'moderate'),
+                            'activities': existing_poi_anywhere.get('activities', []),
+                            'mood_tags': existing_poi_anywhere.get('mood_tags', []),
+                            'highlights': existing_poi_anywhere.get('highlights', []),
+                            'estimated_cost': existing_poi_anywhere.get('estimated_cost', 'Medium'),
+                            'cost_range_pkr': {
+                                'min': existing_poi_anywhere.get('estimated_cost_pkr_min', 1500),
+                                'max': existing_poi_anywhere.get('estimated_cost_pkr_max', 4000)
+                            },
+                            'best_months': existing_poi_anywhere.get('best_months', 'March-October'),
+                            'avg_duration_hours': float(existing_poi_anywhere.get('avg_duration_hours', 3.0)),
+                            'accessibility': existing_poi_anywhere.get('accessibility', ''),
+                            'permits_required': existing_poi_anywhere.get('permits_required', False),
+                            'nearby_facilities': existing_poi_anywhere.get('nearby_facilities', '')
+                        }
+                        
+                        # Use existing photos
+                        photos = existing_poi_anywhere.get('photos', [])
+                    else:
+                        # New POI - enrich with LLM
+                        enriched = self.enricher.enrich_poi(poi)
+                        
+                        # Fetch photos (if available)
+                        photos = []
+                        if self.photo_fetcher.access_key:
+                            photos = self.photo_fetcher.fetch_photos(poi['name'], city, max_photos=3)
+                            if not photos:
+                                # Try fallback generic photos
+                                photos = self.photo_fetcher.fetch_fallback_photos(
+                                    enriched.get('category', 'nature'),
+                                    region
+                                )
                     
                     # Merge all data
                     full_poi = {
@@ -169,15 +209,19 @@ class POIPipeline:
                         'location_id': loc_id
                     }
                     
-                    # Save to database
+                    # Save to database (will insert new entry for this location)
                     self._save_poi(full_poi)
                     successful_pois += 1
                     total_pois += 1
                     
-                    logger.info(f"   ✅ Saved: {poi['name']}")
+                    if existing_poi_anywhere:
+                        logger.info(f"   ✅ Created new entry for this location (reused enrichment): {poi['name']}")
+                    else:
+                        logger.info(f"   ✅ Saved new POI: {poi['name']}")
                     
-                    # Small delay to respect API rate limits
-                    time.sleep(1)
+                    # Small delay to respect API rate limits (only for new POIs that needed enrichment)
+                    if not existing_poi_anywhere:
+                        time.sleep(1)
                     
                 except Exception as e:
                     logger.error(f"   ❌ Error processing {poi.get('name', 'Unknown')}: {e}")
@@ -210,6 +254,69 @@ class POIPipeline:
         cursor.close()
         return count
     
+    def _check_poi_exists_for_location(self, osm_id: str, location_id: int) -> Optional[Dict]:
+        """
+        Check if a POI already exists in the database for a specific location
+        
+        Args:
+            osm_id: OSM ID of the POI
+            location_id: Location ID to check
+            
+        Returns:
+            Existing POI data dictionary if found, None otherwise
+        """
+        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            "SELECT * FROM points_of_interest WHERE osm_id = %s AND location_id = %s",
+            (osm_id, location_id)
+        )
+        result = cursor.fetchone()
+        cursor.close()
+        
+        if result:
+            # Convert to regular dict and handle JSONB fields
+            poi_data = dict(result)
+            # Convert JSONB fields back to lists/dicts if they're strings
+            for field in ['activities', 'mood_tags', 'highlights', 'photos']:
+                if field in poi_data and isinstance(poi_data[field], str):
+                    try:
+                        poi_data[field] = json.loads(poi_data[field])
+                    except:
+                        poi_data[field] = []
+            return poi_data
+        return None
+    
+    def _get_existing_poi_anywhere(self, osm_id: str) -> Optional[Dict]:
+        """
+        Get existing POI data from any location (to reuse enrichment data)
+        
+        Args:
+            osm_id: OSM ID of the POI
+            
+        Returns:
+            Existing POI data dictionary if found in any location, None otherwise
+        """
+        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            "SELECT * FROM points_of_interest WHERE osm_id = %s LIMIT 1",
+            (osm_id,)
+        )
+        result = cursor.fetchone()
+        cursor.close()
+        
+        if result:
+            # Convert to regular dict and handle JSONB fields
+            poi_data = dict(result)
+            # Convert JSONB fields back to lists/dicts if they're strings
+            for field in ['activities', 'mood_tags', 'highlights', 'photos']:
+                if field in poi_data and isinstance(poi_data[field], str):
+                    try:
+                        poi_data[field] = json.loads(poi_data[field])
+                    except:
+                        poi_data[field] = []
+            return poi_data
+        return None
+    
     def _save_poi(self, poi_data: Dict):
         """
         Save POI to database
@@ -227,7 +334,11 @@ class POIPipeline:
          best_months, avg_duration_hours, accessibility, permits_required, 
          nearby_facilities, photos, verified, last_api_fetch)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
-        ON CONFLICT (osm_id) DO UPDATE SET
+        ON CONFLICT (osm_id, location_id) DO UPDATE SET
+            osm_type = EXCLUDED.osm_type,
+            name = EXCLUDED.name,
+            latitude = EXCLUDED.latitude,
+            longitude = EXCLUDED.longitude,
             description = EXCLUDED.description,
             rating = EXCLUDED.rating,
             category = EXCLUDED.category,

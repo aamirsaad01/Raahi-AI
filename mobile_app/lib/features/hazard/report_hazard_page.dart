@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
+import '../../utils/app_constants.dart';
+import 'api_service.dart';
 
 class ReportHazardPage extends StatefulWidget {
   const ReportHazardPage({super.key});
@@ -9,34 +11,96 @@ class ReportHazardPage extends StatefulWidget {
 }
 
 class _ReportHazardPageState extends State<ReportHazardPage> {
+  final HazardApiService _apiService = HazardApiService();
   HazardType _type = HazardType.roadblock;
   Severity _severity = Severity.medium;
+  final TextEditingController _title = TextEditingController();
   final TextEditingController _desc = TextEditingController();
   final TextEditingController _location = TextEditingController();
-  final TextEditingController _lat = TextEditingController();
-  final TextEditingController _lon = TextEditingController();
+  bool _isSubmitting = false;
+  bool _isGeocoding = false;
 
   @override
   void dispose() {
+    _title.dispose();
     _desc.dispose();
     _location.dispose();
-    _lat.dispose();
-    _lon.dispose();
     super.dispose();
+  }
+
+  Future<void> _submitHazard() async {
+    if (_title.text.trim().isEmpty || _location.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all required fields')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _isGeocoding = true;
+    });
+
+    try {
+      await _apiService.reportHazard(
+        type: _type,
+        severity: _severity,
+        location: _location.text.trim(),
+        title: _title.text.trim(),
+        description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hazard reported successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      Navigator.of(context).pop(true); // Return true to indicate success
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _isGeocoding = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Report Hazard')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0).add(AppConstants.footerPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            TextField(
+              controller: _title,
+              decoration: const InputDecoration(
+                labelText: 'Title *',
+                hintText: 'e.g., Road Block on Karakoram Highway',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<HazardType>(
               value: _type,
-              decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Type'),
+              decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Hazard Type *'),
               items: HazardType.values
                   .map((HazardType t) => DropdownMenuItem<HazardType>(value: t, child: Text(t.label)))
                   .toList(),
@@ -45,7 +109,7 @@ class _ReportHazardPageState extends State<ReportHazardPage> {
             const SizedBox(height: 12),
             DropdownButtonFormField<Severity>(
               value: _severity,
-              decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Severity'),
+              decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Severity *'),
               items: Severity.values
                   .map((Severity s) => DropdownMenuItem<Severity>(value: s, child: Text(s.label)))
                   .toList(),
@@ -54,55 +118,52 @@ class _ReportHazardPageState extends State<ReportHazardPage> {
             const SizedBox(height: 12),
             TextField(
               controller: _location,
-              decoration: const InputDecoration(labelText: 'Location', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: TextField(
-                    controller: _lat,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                    decoration: const InputDecoration(labelText: 'Latitude', border: OutlineInputBorder()),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _lon,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                    decoration: const InputDecoration(labelText: 'Longitude', border: OutlineInputBorder()),
-                  ),
-                ),
-              ],
+              decoration: const InputDecoration(
+                labelText: 'Location Name *',
+                hintText: 'e.g., Murree, Naran, Gilgit, Karakoram Highway',
+                border: OutlineInputBorder(),
+                helperText: 'Coordinates will be found automatically',
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _desc,
               minLines: 3,
               maxLines: 5,
-              decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Description (optional)'),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Description (optional)',
+                hintText: 'Additional details about the hazard...',
+              ),
             ),
-            const Spacer(),
+            const SizedBox(height: 24),
+            if (_isGeocoding)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12.0),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 12),
+                    Text('Finding location coordinates...'),
+                  ],
+                ),
+              ),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () {
-                  if (_location.text.trim().isEmpty || _lat.text.trim().isEmpty || _lon.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fill all required fields')));
-                    return;
-                  }
-                  final double? lat = double.tryParse(_lat.text.trim());
-                  final double? lon = double.tryParse(_lon.text.trim());
-                  if (lat == null || lon == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid coordinates')));
-                    return;
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hazard reported (stub).')));
-                  Navigator.of(context).pop();
-                },
-                icon: const Icon(Icons.send_rounded),
-                label: const Text('Submit'),
+                onPressed: _isSubmitting ? null : _submitHazard,
+                icon: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_rounded),
+                label: Text(_isSubmitting ? 'Submitting...' : 'Submit Report'),
               ),
             )
           ],

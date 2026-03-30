@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_constants.dart';
 
 class EmergencyDownloadsPage extends StatelessWidget {
   const EmergencyDownloadsPage({super.key});
@@ -8,7 +9,7 @@ class EmergencyDownloadsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Offline Downloads')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
         children: <Widget>[
           _Tile(title: 'Northern Region Tiles', progress: 0.7),
           _Tile(title: 'Safe Points POIs', progress: 1.0),

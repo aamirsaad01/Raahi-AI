@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/app_constants.dart';
 import 'models.dart';
 
 class PollsPage extends StatelessWidget {
@@ -31,7 +32,7 @@ class PollsPage extends StatelessWidget {
         ],
       ),
       body: ListView.builder(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
         itemCount: polls.length,
         itemBuilder: (BuildContext context, int i) {
           final Poll p = polls[i];

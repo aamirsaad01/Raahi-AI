@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/app_constants.dart';
 import 'models.dart';
 
 class ChatRoomPage extends StatelessWidget {
@@ -65,7 +66,7 @@ class ChatRoomPage extends StatelessWidget {
             ),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
               itemCount: messages.length,
               itemBuilder: (BuildContext context, int i) {
                 final ChatMessage m = messages[i];

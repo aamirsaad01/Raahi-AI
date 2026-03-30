@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
-import '../../widgets/app_footer_nav.dart';
+import '../../utils/app_constants.dart';
 
 class PoiDetailPage extends StatelessWidget {
   final Poi poi;
@@ -11,8 +11,8 @@ class PoiDetailPage extends StatelessWidget {
     final TextTheme text = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(title: Text(poi.name)),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0).add(AppConstants.footerPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[

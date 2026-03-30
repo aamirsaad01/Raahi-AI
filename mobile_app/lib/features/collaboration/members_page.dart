@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_constants.dart';
 import 'models.dart';
 
 class MembersPage extends StatelessWidget {
@@ -57,6 +58,7 @@ class MembersPage extends StatelessWidget {
         ),
       ),
       body: ListView.builder(
+        padding: AppConstants.footerPadding,
         itemCount: members.length,
         itemBuilder: (BuildContext context, int i) {
           final GroupMember m = members[i];

@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'models.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/app_constants.dart';
 import '../../widgets/app_footer_nav.dart';
+import 'api_service.dart';
+import 'export_service.dart';
 
 class PackingResultsPage extends StatefulWidget {
   final PackingFormData form;
@@ -13,11 +17,50 @@ class PackingResultsPage extends StatefulWidget {
 
 class _PackingResultsPageState extends State<PackingResultsPage> {
   late List<PackingSection> sections;
+  bool isLoading = true;
+  String? errorMessage;
+  ChecklistMetadata? metadata;
 
   @override
   void initState() {
     super.initState();
-    sections = _generateSections(widget.form);
+    _loadChecklistFromBackend();
+  }
+
+  Future<void> _loadChecklistFromBackend() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final apiService = PackingApiService();
+      
+      // Convert activities to backend format
+      final activities = widget.form.activities
+          .map((a) => a.backendValue)
+          .toList();
+
+      final response = await apiService.generateChecklist(
+        region: widget.form.region.label,
+        area: widget.form.area,
+        month: widget.form.month,
+        activities: activities,
+      );
+
+      setState(() {
+        sections = response.sections;
+        metadata = response.metadata;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        errorMessage = e.toString();
+        isLoading = false;
+        // Fallback to empty sections
+        sections = [];
+      });
+    }
   }
 
   @override
@@ -38,53 +81,280 @@ class _PackingResultsPageState extends State<PackingResultsPage> {
             padding: const EdgeInsets.only(right: 8.0),
             child: _IconFilledButton(
               icon: Icons.ios_share_rounded,
-              onTap: () {},
+              onTap: () => _showExportOptions(context),  // UPDATED
               tooltip: 'Export',
             ),
           ),
         ],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: sections.length,
-        itemBuilder: (BuildContext context, int index) {
-          final PackingSection section = sections[index];
-          return _SectionCard(
-            section: section,
-            onItemToggle: (String id, bool value) {
-              setState(() {
-                sections = sections.map((PackingSection s) {
-                  if (s.title != section.title) return s;
-                  return PackingSection(
-                    title: s.title,
-                    items: s.items
-                        .map((PackingItem it) => it.id == id ? it.copyWith(checked: value) : it)
-                        .toList(),
-                  );
-                }).toList();
-              });
-            },
-            onItemTap: (PackingItem item) async {
-              final PackingItem? updated = await Navigator.of(context).pushNamed(
-                AppRoutes.packingEdit,
-                arguments: item,
-              ) as PackingItem?;
-              if (updated != null) {
-                setState(() {
-                  sections = sections.map((PackingSection s) {
-                    if (s.title != section.title) return s;
-                    return PackingSection(
-                      title: s.title,
-                      items: s.items
-                          .map((PackingItem it) => it.id == updated.id ? updated : it)
-                          .toList(),
-                    );
-                  }).toList();
-                });
-              }
-            },
-          );
-        },
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : errorMessage != null
+              ? _ErrorView(
+                  message: errorMessage!,
+                  onRetry: _loadChecklistFromBackend,
+                )
+              : Column(
+                  children: [
+                    // Show warnings/tips if available
+                    if (metadata != null) _MetadataHeader(metadata: metadata!),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
+                        itemCount: sections.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          final PackingSection section = sections[index];
+                          return _SectionCard(
+                            section: section,
+                            onItemToggle: (String id, bool value) {
+                              setState(() {
+                                sections = sections.map((PackingSection s) {
+                                  if (s.title != section.title) return s;
+                                  return PackingSection(
+                                    title: s.title,
+                                    items: s.items
+                                        .map((PackingItem it) =>
+                                            it.id == id ? it.copyWith(checked: value) : it)
+                                        .toList(),
+                                  );
+                                }).toList();
+                              });
+                            },
+                            onItemTap: (PackingItem item) async {
+                              final PackingItem? updated = await Navigator.of(context).pushNamed(
+                                AppRoutes.packingEdit,
+                                arguments: item,
+                              ) as PackingItem?;
+                              if (updated != null) {
+                                setState(() {
+                                  sections = sections.map((PackingSection s) {
+                                    if (s.title != section.title) return s;
+                                    return PackingSection(
+                                      title: s.title,
+                                      items: s.items
+                                          .map((PackingItem it) =>
+                                              it.id == updated.id ? updated : it)
+                                          .toList(),
+                                    );
+                                  }).toList();
+                                });
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+    );
+  }
+
+  // ADD THIS METHOD inside _PackingResultsPageState class
+  void _showExportOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: const Text('Export as Text File'),
+                subtitle: const Text('Simple text format with checkboxes'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _exportAsText();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.table_chart_outlined),
+                title: const Text('Export as CSV'),
+                subtitle: const Text('Spreadsheet format for Excel'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _exportAsCSV();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.code_outlined),
+                title: const Text('Export as Markdown'),
+                subtitle: const Text('Formatted document with checkboxes'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _exportAsMarkdown();
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ADD THIS METHOD
+  Future<void> _exportAsText() async {
+    try {
+      await ChecklistExportService.exportAsText(
+        sections: sections,
+        destination: widget.form.area,
+        month: widget.form.month.toString(),
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Checklist exported successfully!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
+    }
+  }
+
+  // ADD THIS METHOD
+  Future<void> _exportAsCSV() async {
+    try {
+      await ChecklistExportService.exportAsCSV(
+        sections: sections,
+        destination: widget.form.area,
+        month: widget.form.month.toString(),
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Checklist exported as CSV!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
+    }
+  }
+
+  // ADD THIS METHOD
+  Future<void> _exportAsMarkdown() async {
+    try {
+      await ChecklistExportService.exportAsMarkdown(
+        sections: sections,
+        destination: widget.form.area,
+        month: widget.form.month.toString(),
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Checklist exported as Markdown!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export failed: $e')),
+        );
+      }
+    }
+  }
+}
+
+// ADD THIS: Error view widget
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to generate checklist',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ADD THIS: Metadata header widget
+class _MetadataHeader extends StatelessWidget {
+  final ChecklistMetadata metadata;
+
+  const _MetadataHeader({required this.metadata});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    if (metadata.warnings.isEmpty && metadata.tips.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      margin: const EdgeInsets.all(12),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (metadata.warnings.isNotEmpty) ...[
+              Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Text('Important Warnings', style: theme.textTheme.titleMedium),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...metadata.warnings.map((w) => Padding(
+                    padding: const EdgeInsets.only(left: 32, bottom: 4),
+                    child: Text(w, style: theme.textTheme.bodySmall),
+                  )),
+              const SizedBox(height: 12),
+            ],
+            if (metadata.tips.isNotEmpty) ...[
+              Row(
+                children: [
+                  const Icon(Icons.lightbulb_outline, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Text('Helpful Tips', style: theme.textTheme.titleMedium),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...metadata.tips.map((t) => Padding(
+                    padding: const EdgeInsets.only(left: 32, bottom: 4),
+                    child: Text(t, style: theme.textTheme.bodySmall),
+                  )),
+            ],
+          ],
+        ),
       ),
     );
   }
