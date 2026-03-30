@@ -1,57 +1,141 @@
-# 🗺️ Raahi AI - Travel Itinerary Generator
+# Raahi AI (FYP) — Travel Planning + Safety Companion
 
-AI-powered travel itinerary generation system for Pakistan. Complete backend API with Flutter mobile app.
+Raahi AI is a full-stack system that helps travelers in Pakistan plan trips end-to-end:
 
----
+- **Itinerary & POIs**: recommend destinations, generate day-by-day plans, show POIs with metadata/photos, and provide cost breakdown.
+- **Packing**: generate packing items and export lists.
+- **Safety**: hazard reporting + NDMA alert ingestion pipeline (scrape → store → (optional) AI enrichment).
+- **Collaboration**: group features in the mobile app (chat/polls/expenses/photos) scaffolded for trip coordination.
 
-## 📁 Project Structure
+This README is written for new team members to quickly understand **what’s implemented so far**, **where it lives**, and **how to run/demo it**.
+
+## What’s in this repo
 
 ```
 Raahi-AI/
-├── backend_scripts/          # Python backend
-│   ├── api/                  # REST API server (Flask)
-│   ├── api_collectors/       # POI data collection system
-│   └── data/                 # CSV data files
-├── database/                 # PostgreSQL setup
-│   └── postgresql/           # SQL scripts
-└── mobile_app/               # Flutter mobile application
+├── backend_scripts/                 # Python backend + collectors + utilities
+│   ├── api/                         # Flask REST API (auth, itinerary, etc.)
+│   ├── api_collectors/              # POI enrichment + data pipelines
+│   ├── ndma_scraper.py              # NDMA scraping utilities
+│   ├── ndma_poller.py               # Poller/service-style runner
+│   └── *.md / *.py                  # Setup docs + maintenance scripts
+├── database/
+│   └── postgresql/                  # SQL schema + migrations
+├── mobile_app/                      # Flutter app (UI + API clients)
+└── FRONTEND_DEVELOPER_SETUP.md      # Most complete setup doc (recommended)
 ```
 
----
+## System architecture (high level)
 
-## 🚀 Quick Start
+**Flutter app** ↔ **Flask REST API** ↔ **PostgreSQL**
 
-### For Frontend Developers (First Time Setup)
+Separately:
 
-**👉 Start here:** See [`FRONTEND_DEVELOPER_SETUP.md`](FRONTEND_DEVELOPER_SETUP.md) for complete step-by-step instructions.
+- **POI pipeline** fills `points_of_interest` (OpenStreetMap → optional LLM enrichment → optional photos)
+- **NDMA pipeline** fills `ndma_alerts` (scrape NDMA advisories → store → optional enrichment)
 
-### Backend Setup (Quick Reference)
+## What has been implemented so far
 
-1. **Database Setup:**
-   - Install PostgreSQL
-   - Create database: `raahi_ai`
-   - Run: `database/postgresql/db_init.sql`
-   - Run: `database/postgresql/update_itinerary_schema.sql`
+### Backend (Python/Flask)
+- **Auth APIs**: user registration + login.
+- **Itinerary APIs**:
+  - destination recommendations based on user inputs
+  - itinerary generation (day-by-day plan, POIs, costs)
+  - itinerary CRUD (create/read/update/delete) and “get user itineraries”
+- **POI services**:
+  - POI matching logic (mood/activities/season/etc.)
+  - POI pipeline utilities for collecting/enriching data into Postgres
+- **Hazard/NDMA utilities**:
+  - NDMA scraper + poller scripts
+  - database migrations for NDMA tables and hazard coordinate support
 
-2. **Environment Variables:**
-   - Create `.env` file in project root
-   - Fill in database credentials
-   - Add API keys (optional): `GEMINI_API_KEY`, `UNSPLASH_ACCESS_KEY`
+Key code locations:
+- **API server entry**: `backend_scripts/api/app.py`
+- **Itinerary routes**: `backend_scripts/api/routes/itinerary.py`
+- **Itinerary logic**: `backend_scripts/api/services/itinerary_generator.py`, `itinerary_recommender.py`
+- **POI matching**: `backend_scripts/api/services/poi_matcher.py`
+- **POI pipeline**: `backend_scripts/api_collectors/poi_pipeline.py`, `llm_enricher.py`
+- **NDMA**: `backend_scripts/ndma_scraper.py`, `backend_scripts/ndma_poller.py`
 
-3. **Install Dependencies:**
-   ```bash
-   cd backend_scripts
-   pip install -r requirements.txt
-   ```
+### Database (PostgreSQL)
+- Core tables for **users**, **itineraries**, **location mapping**, **packing/checklist**, **hazard reports**.
+- Additional schema/migrations for **NDMA alerts** and hazard coordinates.
 
-4. **Start Server:**
-   ```bash
-   cd backend_scripts/api
-   python app.py
-   ```
-   Server runs on: `http://localhost:5000`
+Start here:
+- `database/README.md`
+- `database/postgresql/db_init.sql` (base schema)
+- `database/postgresql/update_itinerary_schema.sql` (itinerary-related updates)
+- `database/postgresql/add_ndma_alerts_table.sql` (NDMA alerts table)
+- `database/postgresql/migrations/` (incremental migrations)
 
-### Mobile App Setup
+### Mobile app (Flutter)
+The app contains implemented screens/features for:
+- **AI chat** (UI screens)
+- **Itinerary** (destination selection, results, POI details, day details, routes map, cost breakdown)
+- **Packing** (planner + results + export)
+- **Hazards** (map, reporting, detail sheets, filters, “my reports”)
+- **Emergency** (SOS setup, safe points, downloads/outbox/settings)
+- **Collaboration** (create/join group, chat rooms, polls, expenses, members, photos)
+
+Key code locations:
+- `mobile_app/lib/features/itinerary/`
+- `mobile_app/lib/features/hazard/`
+- `mobile_app/lib/features/packing/`
+- `mobile_app/lib/features/collaboration/`
+- `mobile_app/lib/features/emergency/`
+
+## How to run (recommended path)
+
+For the most complete step-by-step instructions, follow:
+- **`FRONTEND_DEVELOPER_SETUP.md`**
+
+Below is a quick “team-member” version.
+
+### 1) Create `.env` locally (do not commit)
+`.env` is intentionally **not tracked**. Copy the template:
+
+```bash
+copy .env.example .env
+```
+
+Fill values like:
+
+```env
+DB_NAME=raahi_ai
+DB_USER=postgres
+DB_PASSWORD=CHANGE_ME
+DB_HOST=localhost
+DB_PORT=5432
+```
+
+Optional (only needed for enrichment/photo fetching):
+
+```env
+GEMINI_API_KEY=...
+UNSPLASH_ACCESS_KEY=...
+```
+
+### 2) Setup the database schema
+- Create database: `raahi_ai`
+- Run schema scripts from `database/postgresql/` (see `database/README.md`)
+
+### 3) Install backend dependencies
+
+```bash
+cd backend_scripts
+pip install -r requirements.txt
+```
+
+### 4) Start the backend API
+
+```bash
+cd backend_scripts/api
+python app.py
+```
+
+Base URL: `http://localhost:5000`
+
+### 5) Run the mobile app
 
 ```bash
 cd mobile_app
@@ -59,211 +143,70 @@ flutter pub get
 flutter run
 ```
 
----
+For real device testing: point the app to `http://<YOUR_PC_IP>:5000` (not `localhost`).
 
-## 📡 API Endpoints
+## API overview (what the app calls)
 
-**Base URL:** `http://localhost:5000`
+Base URL: `http://localhost:5000`
 
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - User login
+- **Auth**
+  - `POST /api/auth/register`
+  - `POST /api/auth/login`
+- **Itinerary**
+  - `POST /api/itinerary/recommend`
+  - `POST /api/itinerary/generate`
+  - `GET /api/itinerary/{id}`
+  - `GET /api/itinerary/user/{user_id}`
+  - `PUT /api/itinerary/{id}`
+  - `DELETE /api/itinerary/{id}`
+- **Health**
+  - `GET /api/health`
 
-### Itinerary
-- `POST /api/itinerary/recommend` - Get destination recommendations
-- `POST /api/itinerary/generate` - Generate full itinerary
-- `GET /api/itinerary/{id}` - Get itinerary details
-- `GET /api/itinerary/user/{user_id}` - Get user's itineraries
-- `PUT /api/itinerary/{id}` - Update itinerary
-- `DELETE /api/itinerary/{id}` - Delete itinerary
+Full details + examples:
+- `backend_scripts/api/API_DOCUMENTATION.md`
 
-### Health
-- `GET /api/health` - Health check
+## Data pipelines (POIs + NDMA)
 
-**Full API Documentation:** See `backend_scripts/api/API_DOCUMENTATION.md`
-
----
-
-## 📚 Documentation
-
-- **⭐ Frontend Developer Setup:** [`FRONTEND_DEVELOPER_SETUP.md`](FRONTEND_DEVELOPER_SETUP.md) - **Start here if you're setting up for the first time!**
-- **Backend API:** `backend_scripts/api/API_DOCUMENTATION.md`
-- **Quick Start:** `backend_scripts/api/QUICK_START.md`
-- **Setup Guide:** `backend_scripts/api/SETUP_GUIDE.md`
-- **Mobile Integration:** `backend_scripts/api/MOBILE_APP_INTEGRATION.md`
-- **Database Setup:** `database/README.md`
-- **POI Collection:** `backend_scripts/POI_COLLECTION_GUIDE.md`
-
----
-
-## 🛠️ Tech Stack
-
-**Backend:**
-- Python 3.8+
-- Flask (REST API)
-- PostgreSQL
-- Google Gemini (LLM enrichment)
-- OpenStreetMap (POI data)
-- Unsplash (Photos)
-
-**Mobile:**
-- Flutter/Dart
-- Material Design
-
----
-
-## 🔑 Environment Variables
-
-Create `.env` file in project root:
-
-```env
-# Database
-DB_NAME=raahi_ai
-DB_USER=postgres
-DB_PASSWORD=your_password
-DB_HOST=127.0.0.1
-DB_PORT=5432
-
-# API Keys (Optional)
-GEMINI_API_KEY=your_gemini_key
-UNSPLASH_ACCESS_KEY=your_unsplash_key
-```
-
----
-
-## 📝 Features
-
-- ✅ AI-powered destination recommendations
-- ✅ Personalized itinerary generation
-- ✅ POI matching based on mood & activities
-- ✅ Budget optimization
-- ✅ Season-aware recommendations
-- ✅ Day-by-day scheduling
-- ✅ Cost breakdown
-- ✅ User authentication
-- ✅ Mobile app ready (CORS enabled)
-
----
-
-## 🤝 For Frontend Developers
-
-### API Base URL
-- **Local:** `http://localhost:5000`
-- **Network:** `http://YOUR_IP:5000` (for mobile testing)
-
-### Example Request (Generate Itinerary)
-
-```json
-POST /api/itinerary/generate
-Content-Type: application/json
-
-{
-  "user_id": 1,
-  "destination": "Hunza",
-  "days": 3,
-  "budget": 50000,
-  "mood": ["adventurous", "romantic"],
-  "activities": ["hiking", "photography"],
-  "travel_month": 5
-}
-```
-
-### Example Response
-
-```json
-{
-  "success": true,
-  "itinerary_id": 1,
-  "title": "3-Day Adventure Hunza Trip",
-  "destination": "Hunza",
-  "days": 3,
-  "total_budget": 50000,
-  "cost_breakdown": {
-    "total_estimated": 47000,
-    "breakdown": {
-      "attractions": 12000,
-      "accommodation": 20000,
-      "food": 10000,
-      "transport": 5000
-    }
-  },
-  "daily_plan": [
-    {
-      "day": 1,
-      "date": "2025-12-10",
-      "pois": [...],
-      "total_duration_hours": 8.0,
-      "estimated_cost": 8000
-    }
-  ]
-}
-```
-
-**Full API Reference:** `backend_scripts/api/API_DOCUMENTATION.md`
-
----
-
-## 📦 Data Collection
-
-To collect POI data for locations:
+### POI collection/enrichment
+This fills `points_of_interest` in Postgres so itinerary generation can select real attractions.
 
 ```bash
 cd backend_scripts/api_collectors
-python poi_pipeline.py --limit 10
+python poi_pipeline.py --limit 3
 ```
 
-This collects POIs from OpenStreetMap, enriches with LLM, and fetches photos.
+### NDMA alerts
+The NDMA scripts scrape advisories and store them in Postgres (requires the NDMA table migration).
 
-**Guide:** `backend_scripts/POI_COLLECTION_GUIDE.md`
+Start reading here:
+- `backend_scripts/NDMA_POLLER_README.md`
 
----
+## Demo flow for your FYP presentation
 
-## 🧪 Testing
+1. **Backend health**: open `http://localhost:5000/api/health`
+2. **Register + login**: use app UI or call the auth endpoints
+3. **Generate itinerary**: choose destination + constraints → show results screen + cost breakdown
+4. **Hazard map/reporting**: show hazard map, filters, create a report, view “my reports”
+5. **Packing**: generate packing list for trip parameters + export
+6. (Optional) **Pipelines**:
+   - run POI pipeline for a few locations
+   - run NDMA poller/scraper and show DB table populated
 
-### Health Check
-```bash
-curl http://localhost:5000/api/health
-```
+## Important repo notes
 
-### Register User
-```bash
-curl -X POST http://localhost:5000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test","email":"test@test.com","password":"test123"}'
-```
+- **Secrets**: never commit `.env`. Use `.env.example` as the template.
+- **Line endings**: on Windows you may see CRLF/LF warnings; it’s normal as long as code runs.
 
----
+## Pointers for new team members
 
-## 📄 License
+- If you’re working on **backend**: start at `backend_scripts/api/app.py` and `backend_scripts/api/routes/`.
+- If you’re working on **mobile**: start at `mobile_app/lib/routes/app_routes.dart` and the feature folders.
+- If you’re working on **data pipelines**: start at `backend_scripts/api_collectors/poi_pipeline.py`.
+- If you’re working on **NDMA/safety**: start at `backend_scripts/ndma_scraper.py` and `backend_scripts/ndma_poller.py`.
 
-[Your License Here]
+## Documentation index
 
----
-
-## 👥 Contributors
-
-- Backend: [Your Name]
-- Frontend: [Friend's Name]
-
----
-
-## 🐛 Troubleshooting
-
-**Server won't start:**
-- Check PostgreSQL is running
-- Verify `.env` file exists with correct credentials
-- Check port 5000 is not in use
-
-**Itinerary generation fails:**
-- Ensure database schema is updated (`update_itinerary_schema.sql`)
-- Check POI data exists in database
-- Verify location name spelling
-
-**Mobile app can't connect:**
-- Use your computer's IP address (not localhost)
-- Check firewall allows port 5000
-- Verify CORS is enabled (it is by default)
-
----
-
-**For detailed setup instructions, see:** `backend_scripts/api/SETUP_GUIDE.md`
+- **Setup (recommended)**: `FRONTEND_DEVELOPER_SETUP.md`
+- **Backend docs**: `backend_scripts/README.md`, `backend_scripts/api/API_DOCUMENTATION.md`
+- **Database**: `database/README.md`
+- **NDMA**: `backend_scripts/NDMA_POLLER_README.md`
