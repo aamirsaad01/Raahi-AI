@@ -18,6 +18,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api.routes.auth import auth_bp
 from api.routes.itinerary import itinerary_bp
+from api.routes.chat import chat_bp
+from api.user.service import ensure_default_admin
 from checklist_generator import ChecklistGenerator
 from ndma_poller import NDMAPoller
 from dotenv import load_dotenv
@@ -47,6 +49,13 @@ CORS(app, resources={
 # Register blueprints (Itinerary & Auth)
 app.register_blueprint(auth_bp)
 app.register_blueprint(itinerary_bp)
+app.register_blueprint(chat_bp)
+
+# Ensure default admin account exists
+try:
+    ensure_default_admin()
+except Exception as _admin_bootstrap_err:
+    logger.warning("Could not ensure default admin user: %s", _admin_bootstrap_err)
 
 # ==================== GLOBAL INITIALIZATION ====================
 
@@ -953,14 +962,11 @@ if __name__ == '__main__':
     # NDMA scraper disabled - run manually with: python ndma_poller.py --once
     # run_ndma_scraper_on_startup()
     
-    # Get port from environment or use default
-    port = int(os.getenv('PORT', 5000))
-    
     print("\n" + "="*60)
     print("🚀 Raahi AI Backend API Server (Unified)")
     print("="*60)
-    print(f"📍 Running on: http://localhost:{port}")
-    print(f"📚 API Documentation: http://localhost:{port}")
+    print("📍 Running on: http://localhost:5000")
+    print("📚 API Documentation: http://localhost:5000")
     print("\n📡 Features:")
     print("   ✅ Itinerary Generation")
     print("   ✅ Hazard Alerts (NDMA)")
@@ -972,9 +978,6 @@ if __name__ == '__main__':
     logger.info("📡 NDMA scraper will run on startup and when /api/hazards/refresh is called")
     
     # Run Flask app
-    app.run(
-        host='0.0.0.0',
-        port=port,
-        debug=True
-    )
+    print('Server running on 0.0.0.0:5000. Ready for Ngrok tunneling.')
+    app.run(host='0.0.0.0', port=5000, debug=True)
 

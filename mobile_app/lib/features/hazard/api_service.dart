@@ -6,7 +6,7 @@ class HazardApiService {
   // Change this to your backend URL
   // For local testing: 'http://localhost:5000' or 'http://127.0.0.1:5000'
   // For Android emulator: 'http://10.0.2.2:5000'
-  static const String baseUrl = 'http://127.0.0.1:5000';
+  static const String baseUrl = 'https://coronary-haste-zombie.ngrok-free.dev';
 
   /// Get all hazards (NDMA alerts + user reports)
   /// 

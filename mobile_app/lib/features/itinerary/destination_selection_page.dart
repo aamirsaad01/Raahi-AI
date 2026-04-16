@@ -65,21 +65,20 @@ class _DestinationSelectionPageState extends State<DestinationSelectionPage> {
     }
   }
 
-  void _selectDestination(String destination) {
-    // Create updated form data with selected destination
+  void _selectRecommendation(DestinationRecommendation rec) {
     final updatedForm = ItineraryFormData(
       mood: widget.form.mood,
       budget: widget.form.budget,
       season: widget.form.season,
       activities: widget.form.activities,
       durationDays: widget.form.durationDays,
-      destination: destination,
+      destination: rec.destination,
       travelMonth: widget.form.travelMonth,
       startDate: widget.form.startDate,
       numPeople: widget.form.numPeople,
+      corridorId: rec.corridorId,
     );
 
-    // Navigate to results page to generate itinerary
     Navigator.of(context).pushReplacementNamed(
       AppRoutes.itineraryResults,
       arguments: updatedForm,
@@ -169,7 +168,7 @@ class _DestinationSelectionPageState extends State<DestinationSelectionPage> {
           ..._recommendations.map((recommendation) {
             return _RecommendationCard(
               recommendation: recommendation,
-              onTap: () => _selectDestination(recommendation.destination),
+              onTap: () => _selectRecommendation(recommendation),
             );
           }),
         ],

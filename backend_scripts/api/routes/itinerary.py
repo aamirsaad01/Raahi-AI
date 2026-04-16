@@ -6,12 +6,23 @@ Endpoints for itinerary generation and management
 from flask import Blueprint, request, jsonify
 import sys
 import os
+import logging
 
 # Add parent directories to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from api.services.itinerary_generator import ItineraryGenerator
 from api.services.itinerary_recommender import ItineraryRecommender
+
+logger = logging.getLogger(__name__)
+
+def _get_agent():
+    """Return an ItineraryAgent if OPENAI_API_KEY is configured, else None."""
+    try:
+        from api.services.itinerary_agent import ItineraryAgent
+        return ItineraryAgent()
+    except Exception:
+        return None
 
 # Create blueprint
 itinerary_bp = Blueprint('itinerary', __name__, url_prefix='/api/itinerary')
@@ -206,11 +217,29 @@ def generate_itinerary():
                 'error': 'Number of people must be a positive integer'
             }), 400
         
-        # Generate itinerary
+        # Try the RAG agent first (OpenAI), fall back to the rule-based generator
+        agent = _get_agent()
+        if agent is not None:
+            logger.info("Using ItineraryAgent (OpenAI RAG) for generation")
+            try:
+                result = agent.generate(data)
+                agent.close()
+                if result['success']:
+                    return jsonify(result), 201
+                # If agent returns a non-success result, fall through to legacy
+                logger.warning("Agent returned error: %s – falling back to legacy generator", result.get('error'))
+            except Exception as agent_err:
+                logger.exception("Agent raised exception – falling back: %s", agent_err)
+                try:
+                    agent.close()
+                except Exception:
+                    pass
+
+        # Legacy rule-based generator
         generator = ItineraryGenerator()
         result = generator.generate(data)
         generator.close()
-        
+
         if result['success']:
             return jsonify(result), 201
         else:

@@ -6,7 +6,7 @@ class ItineraryApiService {
   // Change this to your backend URL
   // For local testing: 'http://localhost:5000' or 'http://127.0.0.1:5000'
   // For Android emulator: 'http://10.0.2.2:5000'
-  static const String baseUrl = 'http://127.0.0.1:5000';
+  static const String baseUrl = 'https://coronary-haste-zombie.ngrok-free.dev'; // TODO: Paste the HTTPS Ngrok link here
 
   /// Get destination recommendations based on budget and mood
   Future<Map<String, dynamic>> recommendDestinations({
@@ -60,6 +60,7 @@ class ItineraryApiService {
     int? travelMonth,
     String? startDate,
     int numPeople = 1,
+    int? corridorId,
   }) async {
     try {
       final Map<String, dynamic> requestBody = {
@@ -71,6 +72,7 @@ class ItineraryApiService {
         'num_people': numPeople,
         if (travelMonth != null) 'travel_month': travelMonth,
         if (startDate != null) 'start_date': startDate,
+        if (corridorId != null) 'corridor_id': corridorId,
       };
       
       // Only include user_id if provided
@@ -147,223 +149,119 @@ class ItineraryApiService {
     }
   }
 
-  /// Parse backend response to TripItinerary model
+  /// Parse backend response to TripItinerary model.
+  /// Handles both the new RAG-based schema (days→time_slots) and
+  /// the legacy rule-based schema (daily_plan→pois) for backward compat.
   TripItinerary _parseItineraryResponse(Map<String, dynamic> data) {
-    // Parse daily plan
-    final List<DayPlan> days = [];
-    final dailyPlan = data['daily_plan'] as List<dynamic>? ?? [];
-    
-    for (var dayData in dailyPlan) {
-      final List<Poi> pois = [];
-      final poisData = dayData['pois'] as List<dynamic>? ?? [];
-      
-      for (var poiData in poisData) {
-        // Extract photo URLs
-        final List<String> photos = [];
-        final photosData = poiData['photos'] as List<dynamic>? ?? [];
-        for (var photo in photosData) {
-          if (photo is Map && photo['url'] != null) {
-            photos.add(photo['url'] as String);
-          } else if (photo is String) {
-            photos.add(photo);
-          }
+    // Detect schema: the RAG agent returns `itinerary_title` + `days` as a
+    // JSON array of day objects.  The legacy generator returns `title` +
+    // `daily_plan` and `days` as an integer count.
+    final bool isRagSchema = data.containsKey('itinerary_title') ||
+        (data['days'] is List);
+
+    final List<DayPlan> parsedDays = [];
+
+    if (isRagSchema) {
+      // `days` is the LLM-generated list of day objects
+      final rawDays = (data['days'] is List) ? data['days'] as List<dynamic> : <dynamic>[];
+      for (final d in rawDays) {
+        if (d is Map<String, dynamic>) {
+          parsedDays.add(DayPlan.fromJson(d));
+        } else if (d is Map) {
+          parsedDays.add(DayPlan.fromJson(Map<String, dynamic>.from(d)));
         }
-        
-        // Safely convert numeric values
-        final costValue = poiData['cost'];
-        final double? cost = costValue is int 
-            ? costValue.toDouble() 
-            : costValue is double 
-                ? costValue 
-                : (costValue is num ? costValue.toDouble() : null);
-        
-        final durationValue = poiData['duration_hours'];
-        final double? duration = durationValue is int 
-            ? durationValue.toDouble() 
-            : durationValue is double 
-                ? durationValue 
-                : (durationValue is num ? durationValue.toDouble() : null);
-        
-        final latValue = poiData['latitude'];
-        final double? lat = latValue is int 
-            ? latValue.toDouble() 
-            : latValue is double 
-                ? latValue 
-                : (latValue is num ? latValue.toDouble() : null);
-        
-        final lonValue = poiData['longitude'];
-        final double? lon = lonValue is int 
-            ? lonValue.toDouble() 
-            : lonValue is double 
-                ? lonValue 
-                : (lonValue is num ? lonValue.toDouble() : null);
-        
-        final ratingValue = poiData['rating'];
-        final double? rating = ratingValue is int 
-            ? ratingValue.toDouble() 
-            : ratingValue is double 
-                ? ratingValue 
-                : (ratingValue is num ? ratingValue.toDouble() : null);
-        
-        final matchScoreValue = poiData['match_score'];
-        final double? matchScore = matchScoreValue is int 
-            ? matchScoreValue.toDouble() 
-            : matchScoreValue is double 
-                ? matchScoreValue 
-                : (matchScoreValue is num ? matchScoreValue.toDouble() : null);
-        
-        pois.add(Poi(
-          id: poiData['poi_id']?.toString() ?? '',
-          name: poiData['name'] ?? 'Unknown',
-          region: data['region'] ?? 'Unknown',
-          description: poiData['description'],
-          photos: photos,
-          bestSeason: _getSeasonFromMonth(data['travel_month'] ?? 5),
-          activityType: poiData['category'] ?? 'General',
-          difficulty: poiData['difficulty'] ?? 'Easy',
-          time: poiData['time'],
-          durationHours: duration,
-          cost: cost,
-          latitude: lat,
-          longitude: lon,
-          rating: rating,
-          activities: (poiData['activities'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
-          highlights: (poiData['highlights'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
-          matchScore: matchScore,
+      }
+    } else {
+      // Legacy: convert old daily_plan → new DayPlan shape
+      final dailyPlan = data['daily_plan'] as List<dynamic>? ?? [];
+      for (final dayData in dailyPlan) {
+        final pois = dayData['pois'] as List<dynamic>? ?? [];
+        final slots = pois.map<TimeSlot>((p) {
+          return TimeSlot(
+            timeOfDay: _timeOfDayFromHour(p['time'] as String?),
+            startTime: p['time'] as String? ?? '',
+            endTime: '',
+            activityType: p['category'] as String? ?? 'General',
+            poiId: p['poi_id'] as int?,
+            locationName: p['name'] as String? ?? 'Unknown',
+            description: p['description'] as String? ?? '',
+            estimatedCostPkr: (p['cost'] ?? 0).toString(),
+            travelTips: '',
+            latitude: p['latitude'] != null ? _toDouble(p['latitude']) : null,
+            longitude: p['longitude'] != null ? _toDouble(p['longitude']) : null,
+          );
+        }).toList();
+
+        parsedDays.add(DayPlan(
+          dayNumber: (dayData['day'] as num?)?.toInt() ?? 1,
+          themeTitle: 'Day ${(dayData['day'] as num?)?.toInt() ?? 1}',
+          daySummary: dayData['summary'] as String? ?? '',
+          timeSlots: slots,
         ));
       }
-      
-      // Safely convert day number to int
-      final dayValue = dayData['day'] ?? 1;
-      final int dayNumber = dayValue is int 
-          ? dayValue 
-          : dayValue is double 
-              ? dayValue.toInt() 
-              : (dayValue is num ? dayValue.toInt() : 1);
-      
-      final durationValue = dayData['total_duration_hours'];
-      final double? totalDuration = durationValue is int 
-          ? durationValue.toDouble() 
-          : durationValue is double 
-              ? durationValue 
-              : (durationValue is num ? durationValue.toDouble() : null);
-      
-      final costValue = dayData['estimated_cost'];
-      final double? dayCost = costValue is int 
-          ? costValue.toDouble() 
-          : costValue is double 
-              ? costValue 
-              : (costValue is num ? costValue.toDouble() : null);
-      
-      final activitiesCount = dayData['activities_count'] as int?;
-      
-      days.add(DayPlan(
-        dayNumber: dayNumber,
-        date: dayData['date'],
-        stops: pois,
-        notes: dayData['summary'] ?? dayData['notes'],
-        totalDurationHours: totalDuration,
-        estimatedCost: dayCost,
-        activitiesCount: activitiesCount,
-      ));
     }
 
-    // Parse cost breakdown
-    final costBreakdownData = data['cost_breakdown'] as Map<String, dynamic>?;
-    CostBreakdown? costBreakdown;
-    if (costBreakdownData != null) {
-      final breakdownData = costBreakdownData['breakdown'] as Map<String, dynamic>? ?? {};
-      final perDayData = costBreakdownData['per_day'] as Map<String, dynamic>?;
-      
-      costBreakdown = CostBreakdown(
-        totalBudget: _toDouble(costBreakdownData['total_budget'] ?? 0),
-        totalEstimated: _toDouble(costBreakdownData['total_estimated'] ?? 0),
-        remaining: _toDouble(costBreakdownData['remaining'] ?? 0),
-        breakdown: CostBreakdownDetails(
-          attractions: _toDouble(breakdownData['attractions'] ?? 0),
-          accommodation: _toDouble(breakdownData['accommodation'] ?? 0),
-          food: _toDouble(breakdownData['food'] ?? 0),
-          transport: _toDouble(breakdownData['transport'] ?? 0),
-        ),
-        perDay: perDayData != null ? CostPerDay(
-          accommodation: _toDouble(perDayData['accommodation'] ?? 0),
-          food: _toDouble(perDayData['food'] ?? 0),
-        ) : null,
-      );
+    // Parse cost range (RAG: {min,max}, single number, or legacy fallback)
+    final tec = data['total_estimated_cost_pkr'];
+    CostRange costRange;
+    if (tec is Map) {
+      costRange = CostRange.fromJson(Map<String, dynamic>.from(tec));
+    } else if (tec is num) {
+      final v = tec.toInt();
+      costRange = CostRange(min: v, max: v);
+    } else if (tec is String && tec.trim().isNotEmpty) {
+      final v = int.tryParse(tec.trim()) ?? double.tryParse(tec.trim())?.toInt() ?? 0;
+      costRange = CostRange(min: v, max: v);
+    } else {
+      final est = _toInt(data['cost_breakdown']?['total_estimated'] ?? data['total_budget'] ?? 0);
+      costRange = CostRange(min: est, max: est);
     }
-    
-    // Parse location info
-    final locationInfoData = data['location_info'] as Map<String, dynamic>?;
+
+    // Packing recommendations
+    final packing = (data['packing_recommendations'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+
+    // Trip overview
+    final overview = data['trip_overview'] as String? ?? '';
+
+    // Location info
+    final locData = data['location_info'] as Map<String, dynamic>?;
     LocationInfo? locationInfo;
-    if (locationInfoData != null) {
+    if (locData != null) {
       locationInfo = LocationInfo(
-        latitude: _toDouble(locationInfoData['latitude'] ?? 0),
-        longitude: _toDouble(locationInfoData['longitude'] ?? 0),
-        elevation: locationInfoData['elevation'] != null ? _toDouble(locationInfoData['elevation']) : null,
-        climateZone: locationInfoData['climate_zone'],
-        touristSeason: locationInfoData['tourist_season'],
+        latitude: _toDouble(locData['latitude'] ?? 0),
+        longitude: _toDouble(locData['longitude'] ?? 0),
+        elevation: locData['elevation'] != null ? _toDouble(locData['elevation']) : null,
+        climateZone: locData['climate_zone'] as String?,
+        touristSeason: locData['tourist_season'] as String?,
       );
     }
-    
-    // Extract highlights from POIs
-    final List<String> highlights = [];
-    for (var day in dailyPlan) {
-      final poisData = day['pois'] as List<dynamic>? ?? [];
-      for (var poi in poisData) {
-        final poiHighlights = poi['highlights'] as List<dynamic>? ?? [];
-        highlights.addAll(poiHighlights.map((h) => h.toString()));
-      }
-    }
-    // Remove duplicates and limit
-    highlights.removeWhere((h) => h.isEmpty);
-    final uniqueHighlights = highlights.toSet().toList();
-    final finalHighlights = uniqueHighlights.length > 5 
-        ? uniqueHighlights.sublist(0, 5) 
-        : uniqueHighlights;
 
-    // Safely convert cost to int (backend may return double)
-    final costValue = costBreakdownData?['total_estimated'] ?? data['total_budget'] ?? 0;
-    final int estimatedCost = costValue is int 
-        ? costValue 
-        : costValue is double 
-            ? costValue.toInt() 
-            : (costValue is num ? costValue.toInt() : 0);
-    
-    // Safely convert days to int
-    final daysValue = data['days'];
-    final int daysCount = daysValue is int 
-        ? daysValue 
-        : daysValue is double 
-            ? daysValue.toInt() 
-            : (daysValue is num ? daysValue.toInt() : days.length);
-    
-    // Safely convert total budget to int
-    final budgetValue = data['total_budget'] ?? data['budget'] ?? 0;
-    final int totalBudget = budgetValue is int 
-        ? budgetValue 
-        : budgetValue is double 
-            ? budgetValue.toInt() 
-            : (budgetValue is num ? budgetValue.toInt() : 0);
-    
+    final int daysCount = parsedDays.isNotEmpty
+        ? parsedDays.length
+        : _toInt(data['num_days'] ?? (data['days'] is int ? data['days'] : 0));
+
+    final int totalBudget = _toInt(data['total_budget'] ?? data['budget'] ?? 0);
+
     return TripItinerary(
       id: data['itinerary_id']?.toString() ?? data['id']?.toString() ?? '0',
-      title: data['title'] ?? 'Untitled Itinerary',
-      destination: data['destination'] ?? 'Unknown',
-      region: data['region'] ?? 'Unknown',
+      title: data['itinerary_title'] as String? ?? data['title'] as String? ?? 'Untitled',
+      destination: data['destination'] as String? ?? 'Unknown',
+      region: data['region'] as String? ?? 'Unknown',
       days: daysCount,
       totalBudget: totalBudget,
-      daysPlan: days,
-      estimatedCost: estimatedCost,
-      highlights: finalHighlights.isEmpty 
-          ? ['Scenic Views', 'Local Cuisine', 'Comfortable Stays'] 
-          : finalHighlights,
-      costBreakdown: costBreakdown,
+      numPeople: (data['num_people'] as num?)?.toInt() ?? 1,
+      tripOverview: overview,
+      estimatedCostRange: costRange,
+      estimatedTransportCostPkr: _toIntNullable(data['estimated_transport_cost_pkr']),
+      packingRecommendations: packing,
+      daysPlan: parsedDays,
       locationInfo: locationInfo,
-      selectedPoisCount: data['selected_pois_count'] as int? ?? 0,
-      totalPoisAvailable: data['total_pois_available'] as int? ?? 0,
     );
   }
-  
+
   double _toDouble(dynamic value) {
     if (value is int) return value.toDouble();
     if (value is double) return value;
@@ -371,11 +269,38 @@ class ItineraryApiService {
     return 0.0;
   }
 
-  String _getSeasonFromMonth(int month) {
-    if (month >= 3 && month <= 5) return 'Spring';
-    if (month >= 6 && month <= 8) return 'Summer';
-    if (month >= 9 && month <= 11) return 'Autumn';
-    return 'Winter';
+  int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is num) return value.toInt();
+    if (value is String) {
+      final t = value.trim();
+      if (t.isEmpty) return 0;
+      return int.tryParse(t) ?? double.tryParse(t)?.toInt() ?? 0;
+    }
+    return int.tryParse(value.toString()) ?? 0;
+  }
+
+  int? _toIntNullable(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is num) return value.toInt();
+    if (value is String) {
+      final t = value.trim();
+      if (t.isEmpty) return null;
+      return int.tryParse(t) ?? double.tryParse(t)?.toInt();
+    }
+    return int.tryParse(value.toString());
+  }
+
+  String _timeOfDayFromHour(String? time) {
+    if (time == null || time.isEmpty) return 'Morning';
+    final hour = int.tryParse(time.split(':').first) ?? 9;
+    if (hour < 12) return 'Morning';
+    if (hour < 17) return 'Afternoon';
+    return 'Evening';
   }
 
   /// Convert mood enum to backend format

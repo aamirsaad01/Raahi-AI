@@ -11,9 +11,25 @@ Before you start, make sure you have:
 - [x] PostgreSQL database running with `raahi_ai` database
 - [x] Database schema updated (run `database/postgresql/db_init.sql`)
 - [x] Location data loaded (138 locations in `location_mapping` table)
-- [x] Gemini API key (FREE - see `CREDENTIALS_SETUP.md`)
-- [x] Python dependencies installed
-- [x] `.env` file created with credentials
+- [x] **OpenAI API key** in `.env` as `OPENAI_API_KEY` (recommended for enrichment), **or** local **Ollama** if you set `POI_ENRICHER=ollama`
+- [x] Python dependencies installed (`pip install -r requirements.txt` includes `openai`)
+- [x] `.env` file created with credentials (see root `.env.example`)
+
+### Full repopulation (wipe + OSM + enrichment)
+
+From the repo root:
+
+```bash
+python backend_scripts/api_collectors/repopulate_pois.py --yes
+```
+
+Or wipe only, then run the pipeline with `--force`:
+
+```bash
+python backend_scripts/api_collectors/empty_pois_table.py --yes
+cd backend_scripts/api_collectors
+python poi_pipeline.py --force
+```
 
 ---
 
@@ -27,9 +43,9 @@ pip install -r requirements.txt
 ```
 
 This installs:
-- OpenStreetMap API client (FREE)
-- Google Gemini API (FREE)
-- Unsplash API client (Optional)
+- OpenStreetMap (Overpass) usage via `requests` (free)
+- **openai** (POI text enrichment when `OPENAI_API_KEY` is set)
+- Unsplash client (optional photos)
 
 ### 2. Update Database Schema
 
@@ -72,7 +88,7 @@ python poi_pipeline.py --limit 3
 **What this does:**
 1. Fetches first 3 locations from your database
 2. For each location, queries OpenStreetMap for tourist attractions
-3. Enriches each POI with Gemini LLM (descriptions, ratings, costs, etc.)
+3. Enriches each POI with **OpenAI** (or Ollama if no API key / `POI_ENRICHER=ollama`)
 4. Optionally fetches photos from Unsplash
 5. Saves everything to `points_of_interest` table
 

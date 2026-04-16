@@ -9,6 +9,9 @@ import time
 import logging
 from typing import List, Dict, Optional, Tuple
 
+from api_collectors.geo_utils import distance_meters
+from api_collectors.text_utils import token_set_ratio
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -20,7 +23,7 @@ class OSMCollector:
     
     def __init__(self):
         self.overpass_url = "https://overpass-api.de/api/interpreter"
-        self.timeout = 30
+        self.timeout = 60
         self.rate_limit_delay = 1  # seconds between requests
     
     def fetch_pois_for_location(
@@ -88,7 +91,10 @@ class OSMCollector:
                 if poi and poi['name'] != 'Unnamed':  # Skip unnamed POIs
                     pois.append(poi)
             
-            logger.info(f"✅ Found {len(pois)} POIs from OSM for {location_name}")
+            logger.info(f"✅ Found {len(pois)} raw POIs from OSM for {location_name}")
+            
+            # Apply micro-level deduplication (Intra-location fixes)
+            pois = self._deduplicate_pois(pois)
             
             # Rate limiting - be nice to OSM servers
             time.sleep(self.rate_limit_delay)
@@ -105,16 +111,48 @@ class OSMCollector:
             logger.error(f"❌ Unexpected error: {e}")
             return []
     
+    def _deduplicate_pois(self, raw_pois: List[Dict], distance_threshold_meters: int = 1500, fuzz_threshold: int = 80) -> List[Dict]:
+        """
+        Removes crowdsourced duplicates that are physically close to each other.
+        Now uses token_set_ratio to ignore word order.
+        """
+        unique_pois = []
+        
+        for poi in raw_pois:
+            is_duplicate = False
+            for existing in unique_pois:
+                # 1. Check physical distance (Increased to 1500m for mountainous areas)
+                dist = distance_meters(
+                    float(poi["latitude"]),
+                    float(poi["longitude"]),
+                    float(existing["latitude"]),
+                    float(existing["longitude"]),
+                )
+                
+                # 2. Check name similarity if they are physically close
+                if dist < distance_threshold_meters:
+                    # Swapped to token_set_ratio to handle "Viewpoint on Rakaposhi" vs "Rakaposhi Viewpoint"
+                    name_similarity = token_set_ratio(poi["name"], existing["name"])
+                    
+                    if name_similarity > fuzz_threshold:
+                        is_duplicate = True
+                        # If the new duplicate has more OSM tags, it's likely higher quality data. Replace the old one.
+                        if len(poi.get('osm_tags', {})) > len(existing.get('osm_tags', {})):
+                            existing.update(poi)
+                        break 
+                        
+            if not is_duplicate:
+                unique_pois.append(poi)
+                
+        removed_count = len(raw_pois) - len(unique_pois)
+        if removed_count > 0:
+            logger.info(f"🧹 Deduplication removed {removed_count} redundant/overlapping POIs.")
+            
+        return unique_pois
+
     def _parse_osm_element(self, element: Dict, location_name: str) -> Optional[Dict]:
         """
         Parse OSM element into our POI format
-        
-        Args:
-            element: Raw OSM element from Overpass API
-            location_name: Parent location name
-        
-        Returns:
-            Parsed POI dictionary or None if invalid
         """
         tags = element.get('tags', {})
         
@@ -158,81 +196,46 @@ class OSMCollector:
         }
     
     def _determine_category(self, tags: Dict) -> str:
-        """
-        Map OSM tags to our category system
-        
-        Categories: nature, cultural, adventure, religious, historical
-        """
-        # Nature
+        """Map OSM tags to our category system"""
         if tags.get('natural') in ['peak', 'glacier', 'waterfall', 'valley', 'hot_spring']:
             return 'nature'
-        
-        # Religious
         if tags.get('amenity') == 'place_of_worship':
             return 'religious'
-        
-        # Historical
         if tags.get('historic'):
             return 'historical'
-        
-        # Cultural
         if tags.get('tourism') in ['museum', 'gallery']:
             return 'cultural'
-        
-        # Adventure (based on sport/activity tags)
         if tags.get('sport') or tags.get('climbing'):
             return 'adventure'
-        
-        # Default to nature for viewpoints and attractions
         if tags.get('tourism') in ['viewpoint', 'attraction']:
             return 'nature'
-        
-        return 'nature'  # Default fallback
+        return 'nature' 
     
     def _extract_activities(self, tags: Dict, category: str) -> List[str]:
-        """
-        Extract potential activities from OSM tags
-        
-        Returns list of activity strings
-        """
+        """Extract potential activities from OSM tags"""
         activities = []
         
-        # Nature-based activities
         if tags.get('natural') == 'peak':
             activities.extend(['hiking', 'photography', 'trekking'])
-        
         if tags.get('natural') == 'waterfall':
             activities.extend(['photography', 'hiking', 'sightseeing'])
-        
         if tags.get('natural') == 'glacier':
             activities.extend(['photography', 'trekking', 'adventure'])
-        
         if tags.get('natural') == 'hot_spring':
             activities.extend(['relaxation', 'photography'])
-        
-        # Tourism activities
         if tags.get('tourism') == 'viewpoint':
             activities.extend(['photography', 'sightseeing'])
-        
         if tags.get('tourism') in ['museum', 'gallery']:
             activities.extend(['cultural', 'sightseeing'])
-        
-        # Sport activities
         if tags.get('sport') == 'skiing':
             activities.append('skiing')
-        
         if tags.get('sport') == 'climbing':
             activities.extend(['rock_climbing', 'adventure'])
-        
-        # Parks and leisure
         if tags.get('leisure') == 'park':
             activities.extend(['picnic', 'family', 'relaxation'])
-        
-        # Religious sites
         if tags.get('amenity') == 'place_of_worship':
             activities.extend(['cultural', 'religious', 'sightseeing'])
-        
-        # Default activities based on category
+            
         if not activities:
             if category == 'nature':
                 activities = ['sightseeing', 'photography']
@@ -245,7 +248,6 @@ class OSMCollector:
             else:
                 activities = ['sightseeing']
         
-        # Remove duplicates while preserving order
         seen = set()
         unique_activities = []
         for activity in activities:
@@ -256,31 +258,21 @@ class OSMCollector:
         return unique_activities
 
 
-# Test function
 def test_osm_collector():
-    """Test the OSM collector with a known location"""
     collector = OSMCollector()
-    
-    # Test with Hunza (known tourist destination)
     test_location = {
         'name': 'Hunza',
         'lat': 36.2993187,
         'lon': 74.613428
     }
-    
     print(f"\n{'='*60}")
     print(f"Testing OSM Collector for {test_location['name']}")
     print(f"{'='*60}\n")
-    
-    pois = collector.fetch_pois_for_location(
-        test_location['name'],
-        test_location['lat'],
-        test_location['lon']
-    )
+    pois = collector.fetch_pois_for_location(test_location['name'], test_location['lat'], test_location['lon'])
     
     if pois:
         print(f"\n✅ Found {len(pois)} POIs:")
-        for i, poi in enumerate(pois[:5], 1):  # Show first 5
+        for i, poi in enumerate(pois[:5], 1):
             print(f"\n{i}. {poi['name']}")
             print(f"   Category: {poi['category']}")
             print(f"   Activities: {', '.join(poi['activities'])}")
@@ -291,4 +283,3 @@ def test_osm_collector():
 
 if __name__ == "__main__":
     test_osm_collector()
-

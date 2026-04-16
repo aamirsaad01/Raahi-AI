@@ -3,8 +3,42 @@ POI Matcher Service
 Matches POIs with user preferences and ranks them
 """
 
+import re
 from typing import List, Dict, Optional
 from datetime import datetime
+import math
+
+
+def _split_tag_text(value) -> List[str]:
+    """Split semicolon/comma separated tag text into normalized tokens."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+    text = str(value).strip()
+    if not text:
+        return []
+    parts = re.split(r"[;,]", text)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def parse_estimated_cost_pkr(poi: Dict) -> float:
+    """Parse numeric PKR value from `estimated_cost` text."""
+    # Backward compatibility first
+    legacy = poi.get("estimated_cost_pkr_max")
+    if legacy not in (None, ""):
+        try:
+            return float(legacy)
+        except (TypeError, ValueError):
+            pass
+    raw = str(poi.get("estimated_cost") or "")
+    m = re.search(r"(\d+(?:\.\d+)?)", raw.replace(",", ""))
+    if not m:
+        return 0.0
+    try:
+        return float(m.group(1))
+    except ValueError:
+        return 0.0
 
 
 class POIMatcher:
@@ -106,21 +140,25 @@ class POIMatcher:
             score += (rating / 5.0) * 30
         
         # 2. Mood match (25 points max)
-        user_moods = set(user_prefs.get('mood', []))
-        poi_moods = set(poi.get('mood_tags', []))
+        user_moods = {str(m).strip().lower() for m in user_prefs.get('mood', []) if m}
+        poi_moods = {m.lower() for m in _split_tag_text(poi.get('mood_tags'))}
         if user_moods and poi_moods:
             mood_overlap = len(user_moods & poi_moods)
             score += (mood_overlap / len(user_moods)) * 25
         
         # 3. Activity match (25 points max)
-        user_activities = set(user_prefs.get('activities', []))
-        poi_activities = set(poi.get('activities', []))
+        user_activities = {str(a).strip().lower() for a in user_prefs.get('activities', []) if a}
+        poi_activities = {a.lower() for a in _split_tag_text(poi.get('activities'))}
         if user_activities and poi_activities:
+            """activity_overlap = len(user_activities & poi_activities)
+            score += (activity_overlap / len(user_activities)) * 25"""
             activity_overlap = len(user_activities & poi_activities)
-            score += (activity_overlap / len(user_activities)) * 25
+            k = 1.2  # tune this (0.5..1.2 typical)
+            activity_score = 25 * (1 - math.exp(-k * activity_overlap))
+            score += activity_score
         
         # 4. Budget match (10 points max)
-        poi_cost = poi.get('estimated_cost_pkr_max', 0)
+        poi_cost = parse_estimated_cost_pkr(poi)
         daily_budget = user_prefs.get('budget', 0) / user_prefs.get('days', 1)
         poi_budget_limit = daily_budget * 0.4  # 40% of daily budget for activities
         
@@ -205,7 +243,7 @@ class POIMatcher:
         min_pois_needed = num_days  # At least 1 POI per day
         
         for poi in pois:
-            poi_cost = float(poi.get('estimated_cost_pkr_max', 0))
+            poi_cost = parse_estimated_cost_pkr(poi)
             
             # If we haven't reached minimum, prioritize getting at least 1 per day
             # even if it slightly exceeds budget

@@ -28,5 +28,23 @@ class ChatConversation {
     required this.lastMessageTime,
     required this.messageCount,
   });
+
+  factory ChatConversation.fromJson(Map<String, dynamic> json) {
+    final id = (json['session_id'] ?? json['id'] ?? '').toString();
+    final title = (json['title'] as String?)?.trim();
+    final tsRaw = (json['last_message_at'] ?? json['updated_at'] ?? '').toString();
+    DateTime parsed;
+    try {
+      parsed = DateTime.parse(tsRaw);
+    } catch (_) {
+      parsed = DateTime.now();
+    }
+    return ChatConversation(
+      id: id,
+      title: (title == null || title.isEmpty) ? 'New chat' : title,
+      lastMessageTime: parsed,
+      messageCount: (json['message_count'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
 

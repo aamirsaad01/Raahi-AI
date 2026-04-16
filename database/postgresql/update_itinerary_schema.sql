@@ -1,3 +1,5 @@
+
+
 -- ===============================================
 -- Update Itineraries Table for Full Itinerary Support
 -- Run this script to add new columns for itinerary generation
@@ -30,3 +32,32 @@ BEGIN
     RAISE NOTICE '✅ Itinerary table updated successfully!';
     RAISE NOTICE '📊 New columns added: daily_plan, total_cost, mood_tags, activities, travel_month';
 END $$;
+
+SELECT * FROM points_of_interest
+SELECT * FROM points_of_interest WHERE name = 'Altit Fort'
+
+SELECT *
+FROM points_of_interest
+WHERE name IN (
+    SELECT name
+    FROM points_of_interest
+    GROUP BY name
+    HAVING COUNT(*) > 1
+);
+
+WITH DuplicateCTE AS (
+    SELECT 
+        *, 
+        COUNT(*) OVER(PARTITION BY name) as duplicate_count
+    FROM points_of_interest
+)
+SELECT *
+FROM DuplicateCTE
+WHERE duplicate_count > 1
+ORDER BY name;
+
+SELECT DISTINCT location_id
+FROM points_of_interest;
+
+SELECT * FROM travel_corridors
+

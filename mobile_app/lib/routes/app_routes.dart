@@ -37,12 +37,18 @@ import '../features/ai_chat/ai_chat_page.dart';
 import '../features/ai_chat/history_page.dart';
 import '../features/ai_chat/settings_page.dart';
 import '../features/splash/splash_page.dart';
+import '../features/auth/login_page.dart';
+import '../features/auth/signup_page.dart';
+import '../features/auth/admin_users_page.dart';
 
 class AppRoutes {
   const AppRoutes._();
 
   static const String home = '/home';
   static const String splash = '/';
+  static const String login = '/login';
+  static const String signup = '/signup';
+  static const String adminUsers = '/admin/users';
   static const String itinerary = '/itinerary';
   static const String itineraryDestinationSelection = '/itinerary/destinations';
   static const String itineraryResults = '/itinerary/results';
@@ -81,6 +87,9 @@ class AppRoutes {
   static Map<String, WidgetBuilder> routes() {
     return <String, WidgetBuilder>{
       splash: (BuildContext context) => const SplashPage(),
+      login: (BuildContext context) => const LoginPage(),
+      signup: (BuildContext context) => const SignupPage(),
+      adminUsers: (BuildContext context) => const AdminUsersPage(),
       home: (BuildContext context) => const HomePage(),
       itinerary: (BuildContext context) => const ItineraryFormPage(),
       itineraryDestinationSelection: (BuildContext context) {
@@ -97,7 +106,7 @@ class AppRoutes {
       },
       itineraryPoi: (BuildContext context) {
         final Object? args = ModalRoute.of(context)?.settings.arguments;
-        return PoiDetailPage(poi: args as Poi);
+        return PoiDetailPage(slot: args as TimeSlot);
       },
       itineraryCost: (BuildContext context) {
         final Object? args = ModalRoute.of(context)?.settings.arguments;

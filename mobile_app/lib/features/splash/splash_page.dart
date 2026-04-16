@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../routes/app_routes.dart';
+import '../auth/auth_session.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -13,9 +14,14 @@ class _SplashPageState extends State<SplashPage> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(milliseconds: 1500), () {
+    Timer(const Duration(milliseconds: 1500), () async {
       if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.home, (Route<dynamic> r) => false);
+      final user = await AuthSession.load();
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        user == null ? AppRoutes.login : AppRoutes.home,
+        (Route<dynamic> r) => false,
+      );
     });
   }
 

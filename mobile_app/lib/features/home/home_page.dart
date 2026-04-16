@@ -1,9 +1,38 @@
 import 'package:flutter/material.dart';
 import '../../routes/app_routes.dart';
-import '../../widgets/app_footer_nav.dart';
+import '../auth/auth_session.dart';
+import '../auth/models.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  AuthUser? _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    final user = await AuthSession.load();
+    if (!mounted) return;
+    setState(() => _user = user);
+  }
+
+  Future<void> _logout() async {
+    await AuthSession.clear();
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppRoutes.login,
+      (Route<dynamic> r) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +78,19 @@ class HomePage extends StatelessWidget {
         backgroundColor: colors.primary,
         foregroundColor: Colors.white,
         title: const Text('Raahi AI'),
+        actions: <Widget>[
+          if (_user?.isAdmin == true)
+            IconButton(
+              tooltip: 'Manage Users',
+              onPressed: () => Navigator.of(context).pushNamed(AppRoutes.adminUsers),
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+            ),
+          IconButton(
+            tooltip: 'Logout',
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

@@ -8,65 +8,85 @@ class CostBreakdownPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cost = itinerary.costBreakdown;
-    if (cost == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Cost Breakdown')),
-        body: const Center(child: Text('No cost breakdown available')),
-      );
-    }
-    
-    final TextTheme text = Theme.of(context).textTheme;
+    final text = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
+    final cost = itinerary.estimatedCostRange;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Cost Breakdown')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0).add(AppConstants.footerPadding),
+        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            _Row('Total Budget', cost.totalBudget, text),
-            _Row('Total Estimated', cost.totalEstimated, text),
-            _Row('Remaining', cost.remaining, text, isRemaining: true),
-            const Divider(height: 32),
-            Text('Breakdown', style: text.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          children: [
+            Card(
+              color: colors.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Estimated Total Cost',
+                        style: text.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text(
+                      'PKR ${cost.min.toStringAsFixed(0)} – ${cost.max.toStringAsFixed(0)}',
+                      style: text.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colors.onPrimaryContainer,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'For ${itinerary.numPeople} ${itinerary.numPeople == 1 ? "person" : "people"} · ${itinerary.days} days',
+                      style: text.bodyMedium?.copyWith(
+                        color: colors.onPrimaryContainer.withOpacity(0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Budget: PKR ${itinerary.totalBudget.toStringAsFixed(0)}',
+                      style: text.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    LinearProgressIndicator(
+                      value: itinerary.totalBudget > 0
+                          ? (cost.max / itinerary.totalBudget).clamp(0.0, 1.0)
+                          : 0,
+                      backgroundColor: colors.onPrimaryContainer.withOpacity(0.15),
+                      color: cost.max <= itinerary.totalBudget
+                          ? Colors.green
+                          : Colors.red,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text('Per-Day Activity Costs',
+                style: text.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            _Row('Attractions', cost.breakdown.attractions, text),
-            _Row('Accommodation', cost.breakdown.accommodation, text),
-            _Row('Food', cost.breakdown.food, text),
-            _Row('Transport', cost.breakdown.transport, text),
-            if (cost.perDay != null) ...[
-              const Divider(height: 32),
-              Text('Per Day', style: text.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              _Row('Accommodation (per night)', cost.perDay!.accommodation, text),
-              _Row('Food (per day)', cost.perDay!.food, text),
-            ],
+            ...itinerary.daysPlan.map((day) {
+              int dayTotal = 0;
+              for (final slot in day.timeSlots) {
+                dayTotal += int.tryParse(slot.estimatedCostPkr) ?? 0;
+              }
+              return ListTile(
+                leading: CircleAvatar(
+                  child: Text('${day.dayNumber}'),
+                ),
+                title: Text(day.themeTitle),
+                subtitle: Text('${day.timeSlots.length} activities'),
+                trailing: Text(
+                  'PKR $dayTotal',
+                  style: text.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              );
+            }),
           ],
         ),
       ),
     );
   }
-
-  Widget _Row(String label, double value, TextTheme text, {bool isTotal = false, bool isRemaining = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: <Widget>[
-          Text(label, style: isTotal ? text.titleMedium : text.bodyLarge),
-          Text(
-            'PKR ${value.toStringAsFixed(2)}',
-            style: (isTotal || isRemaining)
-                ? text.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isRemaining ? (value >= 0 ? Colors.green : Colors.red) : null,
-                    )
-                : text.bodyLarge,
-          ),
-        ],
-      ),
-    );
-  }
 }
-
-

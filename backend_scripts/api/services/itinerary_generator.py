@@ -13,7 +13,7 @@ import math
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from api.utils.db_helper import DatabaseHelper
-from api.services.poi_matcher import POIMatcher
+from api.services.poi_matcher import POIMatcher, parse_estimated_cost_pkr
 
 
 class ItineraryGenerator:
@@ -271,7 +271,7 @@ class ItineraryGenerator:
                     start_minute = int((day_duration % 1) * 60)
                     
                     # Get per-person cost
-                    per_person_poi_cost = float(poi.get('estimated_cost_pkr_max', 0))
+                    per_person_poi_cost = parse_estimated_cost_pkr(poi)
                     
                     day_pois.append({
                         'poi_id': poi['poi_id'],
@@ -307,7 +307,7 @@ class ItineraryGenerator:
                     'category': remaining_poi['category'],
                     'time': "09:00",
                     'duration_hours': float(remaining_poi.get('avg_duration_hours', 2.0)),
-                    'cost': float(remaining_poi.get('estimated_cost_pkr_max', 0)),
+                    'cost': parse_estimated_cost_pkr(remaining_poi),
                     'latitude': float(remaining_poi['latitude']),
                     'longitude': float(remaining_poi['longitude']),
                     'description': remaining_poi.get('description', ''),
@@ -318,7 +318,7 @@ class ItineraryGenerator:
                     'photos': remaining_poi.get('photos', []),
                     'match_score': remaining_poi.get('match_score', 0)
                 })
-                day_cost = float(remaining_poi.get('estimated_cost_pkr_max', 0))
+                day_cost = parse_estimated_cost_pkr(remaining_poi)
                 day_duration = poi_duration
             
             # Add daily summary
@@ -376,7 +376,7 @@ class ItineraryGenerator:
         per_person_budget = total_budget / num_people
         
         # POI costs: Entry fees scale linearly with num_people
-        per_person_poi_cost = sum(float(poi.get('estimated_cost_pkr_max', 0)) for poi in pois)
+        per_person_poi_cost = sum(parse_estimated_cost_pkr(poi) for poi in pois)
         total_poi_costs = per_person_poi_cost * num_people
         
         # Budget allocation (per person, then scale)

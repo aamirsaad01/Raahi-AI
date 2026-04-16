@@ -1,6 +1,6 @@
 """
-Re-enrich POIs that have default/fallback values
-This script identifies POIs with generic descriptions and re-enriches them with Gemini AI
+Re-enrich POIs that have default/fallback values (same enricher selection as poi_pipeline:
+OpenAI when OPENAI_API_KEY is set, else Ollama).
 """
 
 import os
@@ -16,9 +16,24 @@ import logging
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api_collectors.llm_enricher import POIEnricher
+from api_collectors.openai_enricher import OpenAIPOIEnricher
 
 # Load environment variables
 load_dotenv()
+
+
+def _make_enricher():
+    mode = (os.getenv("POI_ENRICHER") or "").strip().lower()
+    if mode == "ollama":
+        return POIEnricher()
+    if mode == "openai":
+        return OpenAIPOIEnricher()
+    if (os.getenv("OPENAI_API_KEY") or "").strip():
+        try:
+            return OpenAIPOIEnricher()
+        except Exception as e:
+            logger.warning("OpenAI unavailable (%s); using Ollama.", e)
+    return POIEnricher()
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(name)s:%(message)s')
 logger = logging.getLogger(__name__)
@@ -136,13 +151,12 @@ def main():
     # Connect to database
     conn = connect_to_db()
     
-    # Initialize LLM enricher
     try:
-        enricher = POIEnricher()
-        logger.info("✅ LLM Enricher initialized")
+        enricher = _make_enricher()
+        logger.info("LLM enricher initialized (%s)", type(enricher).__name__)
     except Exception as e:
-        logger.error(f"❌ Failed to initialize LLM enricher: {e}")
-        logger.error("Make sure GEMINI_API_KEY is set in your .env file")
+        logger.error("Failed to initialize enricher: %s", e)
+        logger.error("Set OPENAI_API_KEY or run Ollama (POI_ENRICHER=ollama).")
         return
     
     # Find POIs with default values

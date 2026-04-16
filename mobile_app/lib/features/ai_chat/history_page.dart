@@ -1,42 +1,56 @@
 import 'package:flutter/material.dart';
-import '../../routes/app_routes.dart';
 import '../../utils/app_constants.dart';
+import '../auth/auth_session.dart';
+import 'api_service.dart';
 import 'models.dart';
 
-class AiChatHistoryPage extends StatelessWidget {
+class AiChatHistoryPage extends StatefulWidget {
   const AiChatHistoryPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final List<ChatConversation> conversations = <ChatConversation>[
-      ChatConversation(
-        id: 'c1',
-        title: 'Hunza travel route',
-        lastMessageTime: DateTime.now().subtract(const Duration(hours: 2)),
-        messageCount: 8,
-      ),
-      ChatConversation(
-        id: 'c2',
-        title: 'Weather forecast',
-        lastMessageTime: DateTime.now().subtract(const Duration(days: 1)),
-        messageCount: 5,
-      ),
-      ChatConversation(
-        id: 'c3',
-        title: 'Best places to visit',
-        lastMessageTime: DateTime.now().subtract(const Duration(days: 3)),
-        messageCount: 12,
-      ),
-    ];
+  State<AiChatHistoryPage> createState() => _AiChatHistoryPageState();
+}
 
+class _AiChatHistoryPageState extends State<AiChatHistoryPage> {
+  final AiChatApiService _api = AiChatApiService();
+  bool _loading = true;
+  List<ChatConversation> _conversations = <ChatConversation>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final user = await AuthSession.load();
+      if (user != null) {
+        final conv = await _api.getSessions(user.userId);
+        if (!mounted) return;
+        setState(() => _conversations = conv);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _conversations = <ChatConversation>[]);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Chat History')),
-      body: ListView.separated(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.separated(
         padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
-        itemCount: conversations.length,
+        itemCount: _conversations.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (BuildContext context, int i) {
-          final ChatConversation conv = conversations[i];
+          final ChatConversation conv = _conversations[i];
           return Card(
             child: ListTile(
               leading: const Icon(Icons.chat_bubble_outline_rounded),

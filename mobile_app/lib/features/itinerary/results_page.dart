@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
 import 'api_service.dart';
+import '../auth/auth_session.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/app_constants.dart';
 
@@ -31,7 +32,6 @@ class _ItineraryResultsPageState extends State<ItineraryResultsPage> {
     });
 
     try {
-      // Ensure destination is selected
       if (widget.form.destination == null || widget.form.destination!.isEmpty) {
         setState(() {
           _error = 'No destination selected. Please go back and select a destination.';
@@ -40,11 +40,11 @@ class _ItineraryResultsPageState extends State<ItineraryResultsPage> {
         return;
       }
 
-      // Convert form data to API format
       final mood = _apiService.moodToBackend(widget.form.mood);
-      
+      final sessionUser = await AuthSession.load();
+
       final itinerary = await _apiService.generateItinerary(
-        // userId is optional - not required for anonymous users
+        userId: sessionUser?.userId,
         destination: widget.form.destination!,
         days: widget.form.durationDays,
         budget: widget.form.budget,
@@ -52,6 +52,7 @@ class _ItineraryResultsPageState extends State<ItineraryResultsPage> {
         activities: widget.form.activities,
         travelMonth: widget.form.travelMonth,
         numPeople: widget.form.numPeople,
+        corridorId: widget.form.corridorId,
       );
 
       setState(() {
@@ -71,13 +72,23 @@ class _ItineraryResultsPageState extends State<ItineraryResultsPage> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(title: const Text('Generating Itinerary')),
-        body: const Center(
+        body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Creating your perfect itinerary...'),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 24),
+              Text(
+                'Raahi AI is crafting your perfect trip...',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'This may take a moment',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
             ],
           ),
         ),
@@ -128,233 +139,136 @@ class _ItineraryResultsPageState extends State<ItineraryResultsPage> {
     final itin = _itinerary!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(itin.title),
-        actions: <Widget>[
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: _IconFilledButton(
-              icon: Icons.payments_outlined,
-              tooltip: 'Cost Breakdown',
-              onTap: () => Navigator.of(context).pushNamed(AppRoutes.itineraryCost, arguments: itin),
+        title: Text(itin.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        actions: [
+          if (itin.locationInfo != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _IconFilledButton(
+                icon: Icons.map_rounded,
+                tooltip: 'Route Map',
+                onTap: () => Navigator.of(context)
+                    .pushNamed(AppRoutes.itineraryMap, arguments: itin),
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: _IconFilledButton(
-              icon: Icons.map_rounded,
-              tooltip: 'Route Map',
-              onTap: () => Navigator.of(context).pushNamed(AppRoutes.itineraryMap, arguments: itin),
-            ),
-          ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
-        children: <Widget>[
-          // General Information Section
-          _GeneralInfoSection(itinerary: itin),
-          const SizedBox(height: 24),
-          
-          // Cost Breakdown Section
-          if (itin.costBreakdown != null) ...[
-            _CostBreakdownSection(costBreakdown: itin.costBreakdown!),
-            const SizedBox(height: 24),
+        children: [
+          _OverviewHeader(itinerary: itin),
+          const SizedBox(height: 20),
+          if (itin.packingRecommendations.isNotEmpty) ...[
+            _PackingSection(items: itin.packingRecommendations),
+            const SizedBox(height: 20),
           ],
-          
-          // Daily Plan Section
           Text(
-            'Daily Plan',
+            'Day-by-Day Plan',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 12),
-          ...itin.daysPlan.asMap().entries.map((entry) {
-            final day = entry.value;
-            return _DayCard(day: day, dayIndex: entry.key);
-          }),
+          ...itin.daysPlan.map((day) => _DayTimelineCard(day: day)),
         ],
       ),
     );
   }
 }
 
-class _GeneralInfoSection extends StatelessWidget {
-  final TripItinerary itinerary;
+// ---------------------------------------------------------------------------
+// Overview header with trip narrative, cost range, and hazard banner
+// ---------------------------------------------------------------------------
 
-  const _GeneralInfoSection({required this.itinerary});
+class _OverviewHeader extends StatelessWidget {
+  final TripItinerary itinerary;
+  const _OverviewHeader({required this.itinerary});
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final cost = itinerary.estimatedCostRange;
+
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               itinerary.title,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.place, size: 20, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        itinerary.destination,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Text(
-                        itinerary.region,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                    fontWeight: FontWeight.bold,
                   ),
-                ),
-              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.calendar_today, size: 20, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  '${itinerary.days} ${itinerary.days == 1 ? 'Day' : 'Days'}',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(width: 24),
-                Icon(Icons.account_balance_wallet, size: 20, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'PKR ${itinerary.totalBudget.toStringAsFixed(0)}',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
+                Icon(Icons.place, size: 18, color: colors.primary),
+                const SizedBox(width: 6),
+                Text('${itinerary.destination}, ${itinerary.region}'),
+                const Spacer(),
+                Icon(Icons.calendar_today, size: 18, color: colors.primary),
+                const SizedBox(width: 6),
+                Text('${itinerary.days} Days'),
               ],
             ),
-            if (itinerary.locationInfo != null) ...[
-              const SizedBox(height: 12),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.people, size: 18, color: colors.primary),
+                const SizedBox(width: 6),
+                Text('${itinerary.numPeople} ${itinerary.numPeople == 1 ? "Person" : "People"}'),
+                const Spacer(),
+                Icon(Icons.account_balance_wallet, size: 18, color: colors.primary),
+                const SizedBox(width: 6),
+                Text('PKR ${_fmt(cost.min)} – ${_fmt(cost.max)}'),
+              ],
+            ),
+            if (itinerary.estimatedTransportCostPkr != null &&
+                itinerary.estimatedTransportCostPkr! > 0) ...[
+              const SizedBox(height: 4),
               Row(
                 children: [
-                  Icon(Icons.info_outline, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 8),
+                  Icon(Icons.directions_car_outlined, size: 18,
+                      color: colors.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Transport: ~PKR ${_fmt(itinerary.estimatedTransportCostPkr!)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ],
+            if (itinerary.locationInfo != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.wb_sunny_outlined, size: 18,
+                      color: colors.onSurfaceVariant),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      '${itinerary.locationInfo!.climateZone ?? 'N/A'} • ${itinerary.locationInfo!.touristSeason ?? 'N/A'}',
+                      [
+                        itinerary.locationInfo!.climateZone,
+                        itinerary.locationInfo!.touristSeason,
+                      ].where((s) => s != null && s.isNotEmpty).join(' · '),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
                 ],
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CostBreakdownSection extends StatelessWidget {
-  final CostBreakdown costBreakdown;
-
-  const _CostBreakdownSection({required this.costBreakdown});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Cost Breakdown',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Icon(
-                  Icons.account_balance_wallet,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _CostRow(
-              label: 'Total Budget',
-              amount: costBreakdown.totalBudget,
-              isTotal: false,
-            ),
-            _CostRow(
-              label: 'Total Estimated',
-              amount: costBreakdown.totalEstimated,
-              isTotal: false,
-            ),
-            _CostRow(
-              label: 'Remaining',
-              amount: costBreakdown.remaining,
-              isTotal: false,
-              isRemaining: true,
-            ),
-            const Divider(height: 24),
-            Text(
-              'Breakdown',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            _CostRow(
-              label: 'Attractions',
-              amount: costBreakdown.breakdown.attractions,
-              isTotal: false,
-            ),
-            _CostRow(
-              label: 'Accommodation',
-              amount: costBreakdown.breakdown.accommodation,
-              isTotal: false,
-            ),
-            _CostRow(
-              label: 'Food',
-              amount: costBreakdown.breakdown.food,
-              isTotal: false,
-            ),
-            _CostRow(
-              label: 'Transport',
-              amount: costBreakdown.breakdown.transport,
-              isTotal: false,
-            ),
-            if (costBreakdown.perDay != null) ...[
+            if (itinerary.tripOverview.isNotEmpty) ...[
               const Divider(height: 24),
               Text(
-                'Per Day',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _CostRow(
-                label: 'Accommodation (per night)',
-                amount: costBreakdown.perDay!.accommodation,
-                isTotal: false,
-              ),
-              _CostRow(
-                label: 'Food (per day)',
-                amount: costBreakdown.perDay!.food,
-                isTotal: false,
+                itinerary.tripOverview,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.5,
+                    ),
               ),
             ],
           ],
@@ -362,86 +276,104 @@ class _CostBreakdownSection extends StatelessWidget {
       ),
     );
   }
+
+  static String _fmt(int v) {
+    if (v >= 1000) {
+      return '${(v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1)}k';
+    }
+    return v.toString();
+  }
 }
 
-class _CostRow extends StatelessWidget {
-  final String label;
-  final double amount;
-  final bool isTotal;
-  final bool isRemaining;
+// ---------------------------------------------------------------------------
+// Packing recommendations
+// ---------------------------------------------------------------------------
 
-  const _CostRow({
-    required this.label,
-    required this.amount,
-    this.isTotal = false,
-    this.isRemaining = false,
-  });
+class _PackingSection extends StatelessWidget {
+  final List<String> items;
+  const _PackingSection({required this.items});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: isTotal
-                ? Theme.of(context).textTheme.titleMedium
-                : Theme.of(context).textTheme.bodyMedium,
-          ),
-          Text(
-            'PKR ${amount.toStringAsFixed(2)}',
-            style: (isTotal || isRemaining)
-                ? Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isRemaining
-                          ? (amount >= 0 ? Colors.green : Colors.red)
-                          : null,
-                    )
-                : Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
+    return Card(
+      color: Theme.of(context).colorScheme.tertiaryContainer.withOpacity(0.4),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.backpack_outlined,
+                    color: Theme.of(context).colorScheme.tertiary),
+                const SizedBox(width: 8),
+                Text(
+                  'Packing Recommendations',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...items.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(child: Text(item)),
+                    ],
+                  ),
+                )),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _DayCard extends StatelessWidget {
-  final DayPlan day;
-  final int dayIndex;
+// ---------------------------------------------------------------------------
+// Day card with vertical timeline
+// ---------------------------------------------------------------------------
 
-  const _DayCard({required this.day, required this.dayIndex});
+class _DayTimelineCard extends StatelessWidget {
+  final DayPlan day;
+  const _DayTimelineCard({required this.day});
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
       child: InkWell(
-        onTap: () => Navigator.of(context).pushNamed(AppRoutes.itineraryDay, arguments: day),
+        onTap: () => Navigator.of(context)
+            .pushNamed(AppRoutes.itineraryDay, arguments: day),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Day header
               Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(24),
+                      color: colors.primaryContainer,
+                      borderRadius: BorderRadius.circular(22),
                     ),
                     child: Center(
                       child: Text(
                         '${day.dayNumber}',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
+                              fontWeight: FontWeight.bold,
+                              color: colors.onPrimaryContainer,
+                            ),
                       ),
                     ),
                   ),
@@ -451,64 +383,53 @@ class _DayCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Day ${day.dayNumber}',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          day.themeTitle,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
-                        if (day.date != null)
+                        if (day.daySummary.isNotEmpty)
                           Text(
-                            day.date!,
+                            day.daySummary,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
+                                  color: colors.onSurfaceVariant,
+                                ),
                           ),
                       ],
                     ),
                   ),
-                  if (day.totalDurationHours != null)
-                    Chip(
-                      label: Text('${day.totalDurationHours!.toStringAsFixed(1)}h'),
-                      avatar: const Icon(Icons.access_time, size: 16),
-                    ),
+                  Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
                 ],
               ),
-              const SizedBox(height: 16),
-              if (day.stops.isNotEmpty) ...[
-                Text(
-                  'Places to Visit',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ...day.stops.map((poi) => _PoiItem(poi: poi)),
-              ] else
-                Text(
-                  'No stops planned for this day',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              if (day.estimatedCost != null) ...[
+              if (day.timeSlots.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                const Divider(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Day Cost',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                // Mini timeline preview (max 3 slots)
+                ...day.timeSlots.take(3).toList().asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final slot = entry.value;
+                  final isLast = idx == (day.timeSlots.length > 3
+                      ? 2
+                      : day.timeSlots.length - 1);
+
+                  return _MiniTimelineItem(
+                    slot: slot,
+                    isLast: isLast,
+                  );
+                }),
+                if (day.timeSlots.length > 3)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 28, top: 4),
+                    child: Text(
+                      '+${day.timeSlots.length - 3} more activities',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: colors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
-                    Text(
-                      'PKR ${day.estimatedCost!.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
               ],
             ],
           ),
@@ -518,120 +439,148 @@ class _DayCard extends StatelessWidget {
   }
 }
 
-class _PoiItem extends StatelessWidget {
-  final Poi poi;
-
-  const _PoiItem({required this.poi});
+class _MiniTimelineItem extends StatelessWidget {
+  final TimeSlot slot;
+  final bool isLast;
+  const _MiniTimelineItem({required this.slot, required this.isLast});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
+    final colors = Theme.of(context).colorScheme;
+    final dotColor = _dotColor(slot.timeOfDay, colors);
+
+    return IntrinsicHeight(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  poi.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+          // Timeline rail
+          SizedBox(
+            width: 28,
+            child: Column(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: dotColor,
+                    shape: BoxShape.circle,
                   ),
                 ),
-              ),
-              if (poi.rating != null) ...[
-                Icon(Icons.star, size: 16, color: Colors.amber),
-                const SizedBox(width: 4),
-                Text(
-                  poi.rating!.toStringAsFixed(1),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: colors.outlineVariant,
+                    ),
+                  ),
               ],
-            ],
+            ),
           ),
-          if (poi.time != null) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.access_time, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                const SizedBox(width: 4),
-                Text(
-                  poi.time!,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if (poi.durationHours != null) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    '• ${poi.durationHours!.toStringAsFixed(1)} hours',
-                    style: Theme.of(context).textTheme.bodySmall,
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 72,
+                    child: Text(
+                      slot.startTime,
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(color: colors.onSurfaceVariant),
+                    ),
+                  ),
+                  Icon(
+                    _activityIcon(slot.activityType),
+                    size: 16,
+                    color: colors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      slot.displayTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                   ),
                 ],
-              ],
+              ),
             ),
-          ],
-          if (poi.description != null && poi.description!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              poi.description!,
-              style: Theme.of(context).textTheme.bodySmall,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              if (poi.activityType.isNotEmpty)
-                Chip(
-                  label: Text(poi.activityType),
-                  labelStyle: Theme.of(context).textTheme.labelSmall,
-                  padding: EdgeInsets.zero,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              if (poi.difficulty.isNotEmpty)
-                Chip(
-                  label: Text(poi.difficulty),
-                  labelStyle: Theme.of(context).textTheme.labelSmall,
-                  padding: EdgeInsets.zero,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              if (poi.cost != null && poi.cost! > 0)
-                Chip(
-                  label: Text('PKR ${poi.cost!.toStringAsFixed(0)}'),
-                  labelStyle: Theme.of(context).textTheme.labelSmall,
-                  padding: EdgeInsets.zero,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-            ],
           ),
-          if (poi.highlights.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: poi.highlights.take(3).map((highlight) {
-                return Chip(
-                  label: Text(highlight),
-                  labelStyle: Theme.of(context).textTheme.labelSmall,
-                  padding: EdgeInsets.zero,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                );
-              }).toList(),
-            ),
-          ],
         ],
       ),
     );
   }
+
+  Color _dotColor(String timeOfDay, ColorScheme colors) {
+    switch (timeOfDay.toLowerCase()) {
+      case 'early morning':
+        return Colors.orange.shade400;
+      case 'morning':
+        return Colors.amber.shade700;
+      case 'late morning':
+        return Colors.amber.shade600;
+      case 'afternoon':
+        return colors.primary;
+      case 'late afternoon':
+        return Colors.teal;
+      case 'evening':
+        return Colors.indigo;
+      case 'night':
+        return Colors.blueGrey.shade800;
+      default:
+        return colors.primary;
+    }
+  }
+
+  static IconData _activityIcon(String activityType) {
+    switch (activityType.toLowerCase()) {
+      case 'hiking':
+        return Icons.hiking;
+      case 'breakfast':
+      case 'lunch':
+      case 'dinner':
+      case 'dining':
+        return Icons.restaurant;
+      case 'photography':
+        return Icons.camera_alt_outlined;
+      case 'check-in':
+      case 'check-out':
+      case 'hotel':
+        return Icons.hotel_outlined;
+      case 'rest':
+      case 'free time':
+        return Icons.self_improvement;
+      case 'scenic drive':
+      case 'transit':
+      case 'drive':
+        return Icons.directions_car_outlined;
+      case 'boating':
+        return Icons.directions_boat_outlined;
+      case 'shopping':
+        return Icons.shopping_bag_outlined;
+      case 'swimming':
+        return Icons.pool_outlined;
+      case 'cultural visit':
+        return Icons.museum_outlined;
+      case 'camping setup':
+      case 'camping':
+        return Icons.cabin_outlined;
+      case 'stargazing':
+        return Icons.nights_stay_outlined;
+      case 'sightseeing':
+        return Icons.visibility_outlined;
+      default:
+        return Icons.place_outlined;
+    }
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Reusable icon button
+// ---------------------------------------------------------------------------
 
 class _IconFilledButton extends StatelessWidget {
   final IconData icon;

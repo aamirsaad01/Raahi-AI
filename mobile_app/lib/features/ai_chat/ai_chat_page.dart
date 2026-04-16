@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/app_constants.dart';
+import '../auth/auth_session.dart';
 import 'models.dart';
+import 'api_service.dart';
 
 class AiChatPage extends StatefulWidget {
   const AiChatPage({super.key});
@@ -12,15 +14,49 @@ class AiChatPage extends StatefulWidget {
 
 class _AiChatPageState extends State<AiChatPage> {
   final TextEditingController _messageController = TextEditingController();
-  final List<AiChatMessage> _messages = <AiChatMessage>[
-    AiChatMessage(
-      id: 'welcome',
-      isUser: false,
-      text: 'Assalam-o-Alaikum! Main aap ka travel companion hoon. Mujhe sawaal pooch sakte hain Urdu, Roman Urdu ya English mein.',
-      timestamp: DateTime.now(),
-      language: ChatLanguage.romanUrdu,
-    ),
-  ];
+  final AiChatApiService _api = AiChatApiService();
+  final List<AiChatMessage> _messages = <AiChatMessage>[];
+  int? _sessionId;
+  int? _userId;
+  bool _sending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final user = await AuthSession.load();
+    if (!mounted) return;
+    if (user == null) {
+      setState(() {
+        _messages.add(
+          AiChatMessage(
+            id: 'auth_req',
+            isUser: false,
+            text: 'Please login first to use chatbot.',
+            timestamp: DateTime.now(),
+            language: ChatLanguage.english,
+          ),
+        );
+      });
+      return;
+    }
+    _userId = user.userId;
+    setState(() {
+      _messages.add(
+        AiChatMessage(
+          id: 'welcome',
+          isUser: false,
+          text:
+              'Assalam-o-Alaikum! I can answer with your itinerary, profile and hazards context.',
+          timestamp: DateTime.now(),
+          language: ChatLanguage.romanUrdu,
+        ),
+      );
+    });
+  }
 
   @override
   void dispose() {
@@ -28,33 +64,54 @@ class _AiChatPageState extends State<AiChatPage> {
     super.dispose();
   }
 
-  void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
+  Future<void> _sendMessage() async {
+    if (_messageController.text.trim().isEmpty || _sending) return;
+    if (_userId == null) return;
+    final text = _messageController.text.trim();
 
     setState(() {
+      _sending = true;
       _messages.add(AiChatMessage(
         id: 'user_${DateTime.now().millisecondsSinceEpoch}',
         isUser: true,
-        text: _messageController.text.trim(),
+        text: text,
         timestamp: DateTime.now(),
       ));
-
-      // Simulate AI response
-      Future<void>.delayed(const Duration(milliseconds: 500), () {
-        if (!mounted) return;
-        setState(() {
-          _messages.add(AiChatMessage(
-            id: 'ai_${DateTime.now().millisecondsSinceEpoch}',
-            isUser: false,
-            text: 'Yeh ek sample response hai. Backend integration ke baad real-time answers milenge.',
-            timestamp: DateTime.now(),
-            language: ChatLanguage.romanUrdu,
-          ));
-        });
-      });
     });
-
     _messageController.clear();
+    try {
+      final result = await _api.sendMessage(
+        userId: _userId!,
+        message: text,
+        sessionId: _sessionId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sessionId = (result['session_id'] as num?)?.toInt() ?? _sessionId;
+        _messages.add(AiChatMessage(
+          id: 'ai_${DateTime.now().millisecondsSinceEpoch}',
+          isUser: false,
+          text: (result['reply'] ?? '').toString(),
+          timestamp: DateTime.now(),
+          language: ChatLanguage.romanUrdu,
+        ));
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(AiChatMessage(
+          id: 'ai_err_${DateTime.now().millisecondsSinceEpoch}',
+          isUser: false,
+          text: e.toString().replaceFirst('Exception: ', ''),
+          timestamp: DateTime.now(),
+          language: ChatLanguage.english,
+        ));
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _sending = false);
+      }
+    }
   }
 
   @override
@@ -118,7 +175,7 @@ class _AiChatPageState extends State<AiChatPage> {
                     ),
                   ),
                   IconButton(
-                    onPressed: _sendMessage,
+                    onPressed: _sending ? null : _sendMessage,
                     icon: const Icon(Icons.send_rounded),
                   ),
                 ],

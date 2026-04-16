@@ -1,0 +1,2 @@
+"""Chatbot module (routes + service)."""
+
