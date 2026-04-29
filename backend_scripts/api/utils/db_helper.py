@@ -457,6 +457,26 @@ class DatabaseHelper:
         cursor.close()
         return convert_decimals(dict(row)) if row else None
 
+    def get_active_chat_session_for_itinerary(
+        self, user_id: int, itinerary_id: Optional[int]
+    ) -> Optional[Dict]:
+        """Non-archived session for this user tied to the given itinerary (or NULL itinerary)."""
+        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            """
+            SELECT * FROM chat_sessions
+            WHERE user_id = %s
+              AND is_archived = FALSE
+              AND linked_itinerary_id IS NOT DISTINCT FROM %s
+            ORDER BY COALESCE(last_message_at, created_at) DESC, session_id DESC
+            LIMIT 1
+            """,
+            (user_id, itinerary_id),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return convert_decimals(dict(row)) if row else None
+
     def get_user_chat_sessions(self, user_id: int) -> List[Dict]:
         cursor = self.conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute(
@@ -567,6 +587,82 @@ class DatabaseHelper:
         rows = [convert_decimals(dict(r)) for r in cursor.fetchall()]
         cursor.close()
         return rows
+
+    # ------------------------------------------------------------------
+    # Emergency contacts linked to itineraries
+    # ------------------------------------------------------------------
+
+    def save_itinerary_emergency_contact(
+        self,
+        itinerary_id: int,
+        contact_name: str,
+        relationship: str,
+        phone_number: str,
+    ) -> int:
+        """Insert or append emergency contact for an itinerary."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO itinerary_emergency_contacts
+                (itinerary_id, contact_name, relationship, phone_number)
+            VALUES (%s, %s, %s, %s)
+            RETURNING contact_id
+            """,
+            (itinerary_id, contact_name, relationship, phone_number),
+        )
+        cid = cursor.fetchone()[0]
+        self.conn.commit()
+        cursor.close()
+        return cid
+
+    def get_latest_emergency_contact_for_itinerary(self, itinerary_id: int) -> Optional[Dict]:
+        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            """
+            SELECT contact_id, itinerary_id, contact_name, relationship, phone_number,
+                   created_at, updated_at
+            FROM itinerary_emergency_contacts
+            WHERE itinerary_id = %s
+            ORDER BY created_at DESC, contact_id DESC
+            LIMIT 1
+            """,
+            (itinerary_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return convert_decimals(dict(row)) if row else None
+
+    def get_emergency_contacts_for_itinerary(self, itinerary_id: int) -> List[Dict]:
+        """Return all contacts saved against an itinerary (latest first)."""
+        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            """
+            SELECT contact_id, itinerary_id, contact_name, relationship, phone_number,
+                   created_at, updated_at
+            FROM itinerary_emergency_contacts
+            WHERE itinerary_id = %s
+            ORDER BY created_at DESC, contact_id DESC
+            """,
+            (itinerary_id,),
+        )
+        rows = [convert_decimals(dict(r)) for r in cursor.fetchall()]
+        cursor.close()
+        return rows
+
+    def get_latest_itinerary_for_user(self, user_id: int) -> Optional[Dict]:
+        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            """
+            SELECT * FROM itineraries
+            WHERE user_id = %s
+            ORDER BY created_at DESC, itinerary_id DESC
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return convert_decimals(dict(row)) if row else None
     
     # ------------------------------------------------------------------
     # Travel Corridors

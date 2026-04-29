@@ -6,6 +6,18 @@ import 'models.dart';
 class AiChatApiService {
   static const String baseUrl = 'https://coronary-haste-zombie.ngrok-free.dev';
 
+  /// Resume the chat thread tied to the user's latest itinerary (if any).
+  Future<Map<String, dynamic>> getActiveSession(int userId) async {
+    final uri = Uri.parse('$baseUrl/api/chat/active-session')
+        .replace(queryParameters: <String, String>{'user_id': '$userId'});
+    final response = await http.get(uri);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode == 200 && body['success'] == true) {
+      return body;
+    }
+    throw Exception(body['error'] ?? 'Failed to load active chat session');
+  }
+
   Future<Map<String, dynamic>> sendMessage({
     required int userId,
     required String message,

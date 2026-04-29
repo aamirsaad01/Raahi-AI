@@ -40,6 +40,7 @@ import '../features/splash/splash_page.dart';
 import '../features/auth/login_page.dart';
 import '../features/auth/signup_page.dart';
 import '../features/auth/admin_users_page.dart';
+import '../features/risk_around/risk_around_page.dart';
 
 class AppRoutes {
   const AppRoutes._();
@@ -49,6 +50,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String signup = '/signup';
   static const String adminUsers = '/admin/users';
+  static const String riskAround = '/risk-around';
   static const String itinerary = '/itinerary';
   static const String itineraryDestinationSelection = '/itinerary/destinations';
   static const String itineraryResults = '/itinerary/results';
@@ -90,6 +92,7 @@ class AppRoutes {
       login: (BuildContext context) => const LoginPage(),
       signup: (BuildContext context) => const SignupPage(),
       adminUsers: (BuildContext context) => const AdminUsersPage(),
+      riskAround: (BuildContext context) => const RiskAroundPage(),
       home: (BuildContext context) => const HomePage(),
       itinerary: (BuildContext context) => const ItineraryFormPage(),
       itineraryDestinationSelection: (BuildContext context) {

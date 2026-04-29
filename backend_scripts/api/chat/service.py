@@ -46,11 +46,14 @@ class ChatService:
 
         session = self._resolve_session(user_id, session_id, itinerary_id)
         sid = int(session["session_id"])
+        effective_itinerary_id = itinerary_id
+        if effective_itinerary_id is None and session.get("linked_itinerary_id") is not None:
+            effective_itinerary_id = int(session["linked_itinerary_id"])
 
         self.db.save_chat_message(sid, user_id, "user", message)
 
-        snapshot = self._get_or_refresh_snapshot(session, user_id, itinerary_id)
-        history = self.db.get_chat_messages(sid, limit=10)
+        snapshot = self._get_or_refresh_snapshot(session, user_id, effective_itinerary_id)
+        history = self.db.get_chat_messages(sid, limit=120)
         reply = self._ask_llm(snapshot, history, message)
 
         self.db.save_chat_message(sid, user_id, "assistant", reply)
@@ -75,6 +78,28 @@ class ChatService:
             raise ValueError("Session not found")
         return self.db.get_chat_messages(session_id, limit=500)
 
+    def get_active_session_resume(self, user_id: int) -> Dict:
+        """Session + anchor itinerary for the user's current trip (latest itinerary)."""
+        user = self.db.get_user_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+        latest = self.db.get_latest_itinerary_for_user(user_id)
+        anchor: Optional[int] = None
+        if latest and latest.get("itinerary_id") is not None:
+            anchor = int(latest["itinerary_id"])
+        existing = self.db.get_active_chat_session_for_itinerary(user_id, anchor)
+        if existing:
+            return {
+                "success": True,
+                "session_id": int(existing["session_id"]),
+                "linked_itinerary_id": anchor,
+            }
+        return {
+            "success": True,
+            "session_id": None,
+            "linked_itinerary_id": anchor,
+        }
+
     # --------------------------- internals ---------------------------
     def _resolve_session(
         self,
@@ -87,7 +112,19 @@ class ChatService:
             if not existing or int(existing["user_id"]) != int(user_id):
                 raise ValueError("Session not found")
             return existing
-        new_id = self.db.create_chat_session(user_id=user_id, linked_itinerary_id=itinerary_id)
+
+        latest = self.db.get_latest_itinerary_for_user(user_id)
+        anchor_itinerary_id = itinerary_id
+        if anchor_itinerary_id is None and latest and latest.get("itinerary_id") is not None:
+            anchor_itinerary_id = int(latest["itinerary_id"])
+
+        reuse = self.db.get_active_chat_session_for_itinerary(user_id, anchor_itinerary_id)
+        if reuse:
+            return reuse
+
+        new_id = self.db.create_chat_session(
+            user_id=user_id, linked_itinerary_id=anchor_itinerary_id
+        )
         created = self.db.get_chat_session(new_id)
         if not created:
             raise RuntimeError("Could not create chat session")
@@ -193,7 +230,7 @@ class ChatService:
         )
 
         compact_history = []
-        for m in history[-8:]:
+        for m in history[-24:]:
             role = m.get("role", "user")
             content = str(m.get("content", ""))
             if content:

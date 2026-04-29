@@ -17,6 +17,7 @@ class _AiChatPageState extends State<AiChatPage> {
   final AiChatApiService _api = AiChatApiService();
   final List<AiChatMessage> _messages = <AiChatMessage>[];
   int? _sessionId;
+  int? _linkedItineraryId;
   int? _userId;
   bool _sending = false;
 
@@ -44,18 +45,55 @@ class _AiChatPageState extends State<AiChatPage> {
       return;
     }
     _userId = user.userId;
-    setState(() {
-      _messages.add(
-        AiChatMessage(
-          id: 'welcome',
-          isUser: false,
-          text:
-              'Assalam-o-Alaikum! I can answer with your itinerary, profile and hazards context.',
-          timestamp: DateTime.now(),
-          language: ChatLanguage.romanUrdu,
-        ),
-      );
-    });
+    try {
+      final Map<String, dynamic> resume = await _api.getActiveSession(_userId!);
+      final int? sid = resume['session_id'] != null
+          ? (resume['session_id'] as num).toInt()
+          : null;
+      _linkedItineraryId = resume['linked_itinerary_id'] != null
+          ? (resume['linked_itinerary_id'] as num).toInt()
+          : null;
+
+      List<AiChatMessage> prior = <AiChatMessage>[];
+      if (sid != null) {
+        _sessionId = sid;
+        prior = await _api.getMessages(userId: _userId!, sessionId: sid);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _messages.clear();
+        if (prior.isNotEmpty) {
+          _messages.addAll(prior);
+        } else {
+          _messages.add(
+            AiChatMessage(
+              id: 'welcome',
+              isUser: false,
+              text:
+                  'Assalam-o-Alaikum! I can answer with your itinerary, profile and hazards context.',
+              timestamp: DateTime.now(),
+              language: ChatLanguage.romanUrdu,
+            ),
+          );
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _messages.clear();
+        _messages.add(
+          AiChatMessage(
+            id: 'welcome',
+            isUser: false,
+            text:
+                'Assalam-o-Alaikum! I can answer with your itinerary, profile and hazards context.',
+            timestamp: DateTime.now(),
+            language: ChatLanguage.romanUrdu,
+          ),
+        );
+      });
+    }
   }
 
   @override
@@ -84,6 +122,7 @@ class _AiChatPageState extends State<AiChatPage> {
         userId: _userId!,
         message: text,
         sessionId: _sessionId,
+        itineraryId: _linkedItineraryId,
       );
       if (!mounted) return;
       setState(() {

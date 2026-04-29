@@ -246,3 +246,28 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_last_message ON chat_sessions(user_id, last_message_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_created ON chat_messages(session_id, created_at ASC);
+
+-- ITINERARY EMERGENCY CONTACTS TABLE
+CREATE TABLE IF NOT EXISTS itinerary_emergency_contacts (
+    contact_id SERIAL PRIMARY KEY,
+    itinerary_id INT NOT NULL REFERENCES itineraries(itinerary_id) ON DELETE CASCADE,
+    contact_name VARCHAR(120) NOT NULL,
+    relationship VARCHAR(80) NOT NULL,
+    phone_number VARCHAR(25) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgname = 'itinerary_emergency_contacts_set_updated_at'
+    ) THEN
+        CREATE TRIGGER itinerary_emergency_contacts_set_updated_at
+        BEFORE UPDATE ON itinerary_emergency_contacts
+        FOR EACH ROW
+        EXECUTE FUNCTION set_updated_at();
+    END IF;
+END$$;
+
+CREATE INDEX IF NOT EXISTS idx_itinerary_emergency_contacts_itinerary ON itinerary_emergency_contacts(itinerary_id, created_at DESC);

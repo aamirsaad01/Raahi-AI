@@ -1,6 +1,6 @@
 """
-AI-powered alert extractor for NDMA PDF advisories
-Uses Groq (Llama 3) to extract structured hazard alerts from PDF content
+AI-powered alert extractor for NDMA PDF advisories.
+Uses OpenAI to extract structured hazard alerts from PDF content.
 """
 import os
 import json
@@ -10,12 +10,12 @@ from typing import List, Dict, Optional
 from dotenv import load_dotenv
 
 try:
-    from groq import Groq
-    GROQ_AVAILABLE = True
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
 except ImportError:
-    GROQ_AVAILABLE = False
+    OPENAI_AVAILABLE = False
     logger = logging.getLogger(__name__)
-    logger.warning("⚠️ groq package not installed. Install with: pip install groq")
+    logger.warning("⚠️ openai package not installed. Install with: pip install openai")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,29 +27,29 @@ load_dotenv(dotenv_path=env_path)
 
 
 class AIAlertExtractor:
-    """Extract structured alerts from PDF content using Groq (Llama 3)"""
+    """Extract structured alerts from PDF content using OpenAI."""
     
     def __init__(self):
-        if not GROQ_AVAILABLE:
-            logger.error("❌ groq package not available")
+        if not OPENAI_AVAILABLE:
+            logger.error("❌ openai package not available")
             self.client = None
             return
         
-        # Groq configuration
-        api_key = os.getenv('GROQ_API_KEY')
-        model_name = os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile')
+        # OpenAI configuration
+        api_key = os.getenv('OPENAI_API_KEY')
+        model_name = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
         
         if not api_key:
-            logger.warning("⚠️ GROQ_API_KEY not found in environment variables")
+            logger.warning("⚠️ OPENAI_API_KEY not found in environment variables")
             self.client = None
             return
         
         try:
-            self.client = Groq(api_key=api_key)
+            self.client = OpenAI(api_key=api_key)
             self.model = model_name
-            logger.info(f"✅ Groq initialized successfully with model: {model_name}")
+            logger.info(f"✅ OpenAI initialized successfully with model: {model_name}")
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Groq: {e}")
+            logger.error(f"❌ Failed to initialize OpenAI: {e}")
             self.client = None
         
         # Icon mapping for hazard types
@@ -106,15 +106,15 @@ class AIAlertExtractor:
                 return []
             
             if not self.client:
-                logger.warning("⚠️ Groq client not available, cannot extract alerts")
+                logger.warning("⚠️ OpenAI client not available, cannot extract alerts")
                 return []
             
             # Create prompt for AI
             prompt = self._create_extraction_prompt(pdf_content_clean)
             
-            logger.info(f"🤖 Sending {len(pdf_content_clean)} characters of PDF text to Groq ({self.model})...")
+            logger.info(f"🤖 Sending {len(pdf_content_clean)} characters of PDF text to OpenAI ({self.model})...")
             
-            # Call Groq API
+            # Call OpenAI API
             try:
                 response = self.client.chat.completions.create(
                     model=self.model,
@@ -129,23 +129,23 @@ class AIAlertExtractor:
                         }
                     ],
                     temperature=0.1,  # Low temperature for consistent JSON
-                    max_tokens=8192
+                    max_tokens=4000
                 )
                 
                 ai_text = response.choices[0].message.content
                 
                 if not ai_text:
-                    logger.error("❌ Empty response from Groq")
+                    logger.error("❌ Empty response from OpenAI")
                     return []
                 
                 # Log raw response for debugging
-                logger.debug(f"Raw Groq response (first 1000 chars):\n{ai_text[:1000]}")
+                logger.debug(f"Raw OpenAI response (first 1000 chars):\n{ai_text[:1000]}")
                 
                 # Parse AI response
                 alerts = self._parse_ai_response(ai_text)
                 
             except Exception as e:
-                logger.error(f"❌ Error calling Groq API: {e}")
+                logger.error(f"❌ Error calling OpenAI API: {e}")
                 return []
             
             logger.info(f"✅ AI extracted {len(alerts)} alert(s) from PDF")
@@ -160,7 +160,7 @@ class AIAlertExtractor:
         """Create prompt for AI extraction - receives summarized PDF text"""
         # Clean and normalize the PDF content
         pdf_text = pdf_content.strip()
-        logger.info(f"📄 Sending {len(pdf_text)} characters of summarized PDF text to Groq")
+        logger.info(f"📄 Sending {len(pdf_text)} characters of summarized PDF text to OpenAI")
         
         return f"""You are an expert at extracting hazard alerts from NDMA (National Disaster Management Authority) advisory PDFs.
 
@@ -221,7 +221,7 @@ Extract all alerts and return as JSON array (no markdown, no code blocks):"""
             # Clean the response text
             cleaned_text = ai_text.strip()
             
-            # Groq may return JSON with extra text - extract just the JSON array
+            # OpenAI may return JSON with extra text - extract just the JSON array
             # Find the first [ and matching ] (handling nested structures)
             json_str = self._extract_json_from_text(cleaned_text)
             

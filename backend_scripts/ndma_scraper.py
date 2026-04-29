@@ -486,7 +486,7 @@ class NDMAScraper:
                 summarized_text = pdf_content[:2000]  # Fallback to first 2000 chars
             
             # Step 2: Use AI to extract alerts from summarized text
-            logger.info(f"🤖 Sending summarized text ({len(summarized_text)} chars) to Ollama...")
+            logger.info(f"🤖 Sending summarized text ({len(summarized_text)} chars) to OpenAI...")
             alerts = self.ai_extractor.extract_alerts_from_pdf(summarized_text, advisory_url)
             
             if alerts:

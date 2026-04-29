@@ -226,8 +226,14 @@ def generate_itinerary():
                 agent.close()
                 if result['success']:
                     return jsonify(result), 201
-                # If agent returns a non-success result, fall through to legacy
-                logger.warning("Agent returned error: %s – falling back to legacy generator", result.get('error'))
+                # Do not fall back when data is missing (unknown city / no POIs).
+                if result.get('terminal'):
+                    return jsonify(result), 400
+                # If agent returns other non-success results, fall through to legacy
+                logger.warning(
+                    "Agent returned error: %s – falling back to legacy generator",
+                    result.get('error'),
+                )
             except Exception as agent_err:
                 logger.exception("Agent raised exception – falling back: %s", agent_err)
                 try:

@@ -56,14 +56,14 @@ class _HomePageState extends State<HomePage> {
         route: AppRoutes.hazardMap,
       ),
       _HomeAction(
+        title: 'Risk Around Me',
+        icon: Icons.radar_rounded,
+        route: AppRoutes.riskAround,
+      ),
+      _HomeAction(
         title: 'Emergency Mode',
         icon: Icons.sos_rounded,
         route: AppRoutes.emergency,
-      ),
-      _HomeAction(
-        title: 'Collaboration',
-        icon: Icons.groups_rounded,
-        route: AppRoutes.collaboration,
       ),
       _HomeAction(
         title: 'AI Chat (Urdu)',

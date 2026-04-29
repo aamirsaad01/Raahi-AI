@@ -21,12 +21,14 @@ class ChatConversation {
   final String title;
   final DateTime lastMessageTime;
   final int messageCount;
+  final int? linkedItineraryId;
 
   const ChatConversation({
     required this.id,
     required this.title,
     required this.lastMessageTime,
     required this.messageCount,
+    this.linkedItineraryId,
   });
 
   factory ChatConversation.fromJson(Map<String, dynamic> json) {
@@ -44,6 +46,7 @@ class ChatConversation {
       title: (title == null || title.isEmpty) ? 'New chat' : title,
       lastMessageTime: parsed,
       messageCount: (json['message_count'] as num?)?.toInt() ?? 0,
+      linkedItineraryId: (json['linked_itinerary_id'] as num?)?.toInt(),
     );
   }
 }

@@ -210,16 +210,41 @@ class ItineraryAgent:
         if not location:
             return {
                 "success": False,
-                "error": f"Location '{user_prefs['destination']}' not found",
-                "suggestion": "Check spelling or try a different location",
+                "error": (
+                    f"Destination '{user_prefs['destination']}' is not in our "
+                    "database. Itinerary cannot be generated."
+                ),
+                "suggestion": "Pick a city from recommendations or check spelling.",
+                "terminal": True,
+            }
+
+        raw_pois = self.db.get_pois_for_location(
+            location_id=location["location_id"],
+            mood_tags=None,
+            activities=None,
+        )
+        if not raw_pois:
+            city_name = location.get("city") or user_prefs["destination"]
+            return {
+                "success": False,
+                "error": (
+                    f"No points of interest (POIs) exist for '{city_name}' in our "
+                    "database. Itinerary cannot be generated."
+                ),
+                "suggestion": "Choose another destination with POI coverage.",
+                "terminal": True,
             }
 
         pois = self._retrieve_pois(location, user_prefs)
         if not pois:
             return {
                 "success": False,
-                "error": "No attractions found for this location",
-                "suggestion": "Try different preferences or another destination",
+                "error": (
+                    "No POIs matched your mood and activities for this destination "
+                    "after filtering. Itinerary cannot be generated."
+                ),
+                "suggestion": "Try broader mood/activities or another destination.",
+                "terminal": True,
             }
 
         self._assign_visit_order(
@@ -279,8 +304,12 @@ class ItineraryAgent:
         if not pois:
             return {
                 "success": False,
-                "error": f"No attractions found along corridor '{corridor['name']}'",
-                "suggestion": "Try different preferences or another corridor",
+                "error": (
+                    f"No points of interest (POIs) are available along corridor "
+                    f"'{corridor['name']}'. Itinerary cannot be generated."
+                ),
+                "suggestion": "Try different preferences or another corridor.",
+                "terminal": True,
             }
 
         # Use the first stop's location for hazard/weather context

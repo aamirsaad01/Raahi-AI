@@ -48,6 +48,7 @@ class HazardReport {
   final String? description;
   final String? advisoryUrl; // For NDMA alerts
   final String? advisoryType; // For NDMA alerts
+  final double? distanceKm; // Optional: distance from scan center
 
   const HazardReport({
     required this.id,
@@ -61,6 +62,7 @@ class HazardReport {
     this.description,
     this.advisoryUrl,
     this.advisoryType,
+    this.distanceKm,
   });
 
   factory HazardReport.fromJson(Map<String, dynamic> json) {
@@ -76,6 +78,7 @@ class HazardReport {
       description: json['description'],
       advisoryUrl: json['advisory_url'],
       advisoryType: json['advisory_type'],
+      distanceKm: (json['distance_km'] as num?)?.toDouble(),
     );
   }
 
@@ -92,6 +95,7 @@ class HazardReport {
       'description': description,
       'advisory_url': advisoryUrl,
       'advisory_type': advisoryType,
+      'distance_km': distanceKm,
     };
   }
 

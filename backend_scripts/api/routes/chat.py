@@ -46,6 +46,25 @@ def send_message():
         service.close()
 
 
+@chat_bp.route("/active-session", methods=["GET"])
+def active_session():
+    """Resume chat for the user's latest itinerary (same thread until a new itinerary exists)."""
+    try:
+        user_id = int(request.args.get("user_id", "0"))
+    except (TypeError, ValueError):
+        user_id = 0
+    if user_id <= 0:
+        return jsonify({"success": False, "error": "user_id is required"}), 400
+    service = ChatService()
+    try:
+        payload = service.get_active_session_resume(user_id)
+        return jsonify(payload), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        service.close()
+
+
 @chat_bp.route("/sessions", methods=["GET"])
 def list_sessions():
     try:

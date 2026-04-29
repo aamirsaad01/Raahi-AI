@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Raahi uses your location to compose emergency SOS messages with your live coordinates.</string>
 </dict>
 </plist>

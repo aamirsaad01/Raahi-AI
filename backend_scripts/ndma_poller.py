@@ -168,8 +168,8 @@ class NDMAPoller:
             
             logger.info(f"✅ Extracted {len(pdf_content)} characters from PDF")
             
-            # Use AI (Ollama) to extract structured alerts from PDF
-            logger.info(f"🤖 Sending PDF text to Ollama to extract alerts...")
+            # Use AI (OpenAI) to extract structured alerts from PDF
+            logger.info(f"🤖 Sending PDF text to OpenAI to extract alerts...")
             ai_alerts = self.scraper.extract_alerts_from_pdf_ai(pdf_content, advisory_url, advisory)
             
             if not ai_alerts:

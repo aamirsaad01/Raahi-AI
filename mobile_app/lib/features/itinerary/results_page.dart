@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'models.dart';
 import 'api_service.dart';
 import '../auth/auth_session.dart';
+import '../emergency/emergency_contact_service.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/app_constants.dart';
 
@@ -15,9 +16,24 @@ class ItineraryResultsPage extends StatefulWidget {
 
 class _ItineraryResultsPageState extends State<ItineraryResultsPage> {
   final ItineraryApiService _apiService = ItineraryApiService();
+  final EmergencyContactService _emergencyContactService = EmergencyContactService();
+  final TextEditingController _emergencyNameCtrl = TextEditingController();
+  final TextEditingController _emergencyRelationCtrl = TextEditingController();
+  final TextEditingController _emergencyPhoneCtrl = TextEditingController();
   TripItinerary? _itinerary;
   bool _isLoading = true;
   String? _error;
+  bool _savingEmergencyContact = false;
+  bool _pendingEmergencyContactSave = false;
+  String? _emergencySaveStatus;
+
+  @override
+  void dispose() {
+    _emergencyNameCtrl.dispose();
+    _emergencyRelationCtrl.dispose();
+    _emergencyPhoneCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -59,6 +75,9 @@ class _ItineraryResultsPageState extends State<ItineraryResultsPage> {
         _itinerary = itinerary;
         _isLoading = false;
       });
+      if (_pendingEmergencyContactSave) {
+        await _saveEmergencyContactNow(showSuccessSnack: true);
+      }
     } catch (e) {
       setState(() {
         _error = e.toString().replaceAll('Exception: ', '');
@@ -72,22 +91,42 @@ class _ItineraryResultsPageState extends State<ItineraryResultsPage> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(title: const Text('Generating Itinerary')),
-        body: Center(
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              const SizedBox(height: 10),
               const CircularProgressIndicator(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
               Text(
-                'Raahi AI is crafting your perfect trip...',
+                'Generating itinerary in background...',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
-                'This may take a moment',
+                'While we prepare your trip, add one emergency contact.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
+              ),
+              const SizedBox(height: 18),
+              _EmergencyContactFormCard(
+                nameController: _emergencyNameCtrl,
+                relationController: _emergencyRelationCtrl,
+                phoneController: _emergencyPhoneCtrl,
+                isSaving: _savingEmergencyContact,
+                status: _emergencySaveStatus,
+                onSave: () async {
+                  if (_itinerary == null) {
+                    setState(() {
+                      _pendingEmergencyContactSave = true;
+                      _emergencySaveStatus =
+                          'Contact noted. It will be linked once itinerary is ready.';
+                    });
+                    return;
+                  }
+                  await _saveEmergencyContactNow(showSuccessSnack: true);
+                },
               ),
             ],
           ),
@@ -171,6 +210,126 @@ class _ItineraryResultsPageState extends State<ItineraryResultsPage> {
           const SizedBox(height: 12),
           ...itin.daysPlan.map((day) => _DayTimelineCard(day: day)),
         ],
+      ),
+    );
+  }
+
+  Future<void> _saveEmergencyContactNow({required bool showSuccessSnack}) async {
+    final itin = _itinerary;
+    if (itin == null) return;
+    final name = _emergencyNameCtrl.text.trim();
+    final relation = _emergencyRelationCtrl.text.trim();
+    final phone = _emergencyPhoneCtrl.text.trim();
+    if (name.length < 2 || relation.length < 2 || phone.length < 10) {
+      setState(() {
+        _emergencySaveStatus = 'Please enter valid emergency contact details.';
+      });
+      return;
+    }
+
+    setState(() => _savingEmergencyContact = true);
+    try {
+      await _emergencyContactService.saveForItinerary(
+        itineraryId: int.tryParse(itin.id) ?? 0,
+        contactName: name,
+        relationship: relation,
+        phoneNumber: phone,
+      );
+      if (!mounted) return;
+      setState(() {
+        _pendingEmergencyContactSave = false;
+        _emergencySaveStatus = 'Emergency contact linked with this itinerary.';
+      });
+      if (showSuccessSnack) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Emergency contact saved.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _emergencySaveStatus = e.toString().replaceAll('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _savingEmergencyContact = false);
+    }
+  }
+}
+
+class _EmergencyContactFormCard extends StatelessWidget {
+  final TextEditingController nameController;
+  final TextEditingController relationController;
+  final TextEditingController phoneController;
+  final bool isSaving;
+  final String? status;
+  final Future<void> Function() onSave;
+
+  const _EmergencyContactFormCard({
+    required this.nameController,
+    required this.relationController,
+    required this.phoneController,
+    required this.isSaving,
+    required this.status,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Emergency Contact',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Name of emergency contact',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: relationController,
+              decoration: const InputDecoration(
+                labelText: "Person's relationship with emergency contact",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Phone number of emergency contact',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: isSaving ? null : onSave,
+                icon: const Icon(Icons.save_outlined),
+                label: Text(isSaving ? 'Saving...' : 'Save Emergency Contact'),
+              ),
+            ),
+            if (status != null && status!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                status!,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

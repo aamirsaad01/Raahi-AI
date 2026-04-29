@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'models.dart';
 import '../../utils/app_constants.dart';
 import 'api_service.dart';
@@ -17,15 +18,74 @@ class _ReportHazardPageState extends State<ReportHazardPage> {
   final TextEditingController _title = TextEditingController();
   final TextEditingController _desc = TextEditingController();
   final TextEditingController _location = TextEditingController();
+  final TextEditingController _lat = TextEditingController();
+  final TextEditingController _lon = TextEditingController();
   bool _isSubmitting = false;
   bool _isGeocoding = false;
+  bool _fetchingCoords = false;
 
   @override
   void dispose() {
     _title.dispose();
     _desc.dispose();
     _location.dispose();
+    _lat.dispose();
+    _lon.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchCurrentCoordinates() async {
+    setState(() => _fetchingCoords = true);
+    try {
+      final enabled = await Geolocator.isLocationServiceEnabled();
+      if (!enabled) {
+        throw Exception('Location services are turned off.');
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw Exception('Location permission denied.');
+      }
+      Position pos;
+      try {
+        pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        ).timeout(const Duration(seconds: 12));
+      } catch (_) {
+        final last = await Geolocator.getLastKnownPosition();
+        if (last != null) {
+          pos = last;
+        } else {
+          rethrow;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _lat.text = pos.latitude.toStringAsFixed(6);
+        _lon.text = pos.longitude.toStringAsFixed(6);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Coordinates filled from your current location.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not get location: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _fetchingCoords = false);
+    }
+  }
+
+  double? _parseOptionalCoord(String s) {
+    final t = s.trim();
+    if (t.isEmpty) return null;
+    return double.tryParse(t.replaceAll(',', '.'));
   }
 
   Future<void> _submitHazard() async {
@@ -36,9 +96,20 @@ class _ReportHazardPageState extends State<ReportHazardPage> {
       return;
     }
 
+    final double? lat = _parseOptionalCoord(_lat.text);
+    final double? lon = _parseOptionalCoord(_lon.text);
+    if ((lat != null) != (lon != null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter both latitude and longitude, or leave both empty to use the location name.'),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
-      _isGeocoding = true;
+      _isGeocoding = lat == null && lon == null;
     });
 
     try {
@@ -48,6 +119,8 @@ class _ReportHazardPageState extends State<ReportHazardPage> {
         location: _location.text.trim(),
         title: _title.text.trim(),
         description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
+        latitude: lat,
+        longitude: lon,
       );
 
       if (!mounted) return;
@@ -122,8 +195,39 @@ class _ReportHazardPageState extends State<ReportHazardPage> {
                 labelText: 'Location Name *',
                 hintText: 'e.g., Murree, Naran, Gilgit, Karakoram Highway',
                 border: OutlineInputBorder(),
-                helperText: 'Coordinates will be found automatically',
+                helperText: 'If latitude/longitude below are empty, coordinates are resolved from this name',
               ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Expanded(
+                  child: TextField(
+                    controller: _lat,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Latitude (optional)',
+                      hintText: 'e.g., 34.0522',
+                      border: OutlineInputBorder(),
+                      helperText: 'Decimal degrees',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _lon,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Longitude (optional)',
+                      hintText: 'e.g., 73.2167',
+                      border: OutlineInputBorder(),
+                      helperText: 'Decimal degrees',
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             TextField(
@@ -152,6 +256,21 @@ class _ReportHazardPageState extends State<ReportHazardPage> {
                   ],
                 ),
               ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _isSubmitting || _fetchingCoords ? null : _fetchCurrentCoordinates,
+                icon: _fetchingCoords
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.my_location_rounded),
+                label: Text(_fetchingCoords ? 'Getting location...' : 'Fetch Current Coordinates'),
+              ),
+            ),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(

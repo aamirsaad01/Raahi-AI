@@ -12,6 +12,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timezone
 import threading
+import math
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,6 +20,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from api.routes.auth import auth_bp
 from api.routes.itinerary import itinerary_bp
 from api.routes.chat import chat_bp
+from api.routes.emergency import emergency_bp
 from api.user.service import ensure_default_admin
 from checklist_generator import ChecklistGenerator
 from ndma_poller import NDMAPoller
@@ -50,6 +52,7 @@ CORS(app, resources={
 app.register_blueprint(auth_bp)
 app.register_blueprint(itinerary_bp)
 app.register_blueprint(chat_bp)
+app.register_blueprint(emergency_bp)
 
 # Ensure default admin account exists
 try:
@@ -700,15 +703,41 @@ def report_hazard():
                 'error': f'Severity must be one of: {", ".join(valid_severities)}'
             }), 400
         
-        # Geocode location name to get coordinates
         location_name = data['location'].strip()
-        lat, lon = _geocode_location(location_name)
-        
-        if lat is None or lon is None:
-            return jsonify({
-                'success': False,
-                'error': f'Could not find coordinates for location: {location_name}. Please provide a more specific location name.'
-            }), 400
+
+        # Optional explicit coordinates (skip Geoapify/OSM geocoding when both valid)
+        raw_lat = data.get('latitude')
+        raw_lon = data.get('longitude')
+        has_lat = raw_lat is not None and str(raw_lat).strip() != ''
+        has_lon = raw_lon is not None and str(raw_lon).strip() != ''
+        lat = None
+        lon = None
+        if has_lat or has_lon:
+            if not (has_lat and has_lon):
+                return jsonify({
+                    'success': False,
+                    'error': 'Provide both latitude and longitude, or leave both empty to geocode from the location name.',
+                }), 400
+            try:
+                lat = float(raw_lat)
+                lon = float(raw_lon)
+            except (TypeError, ValueError):
+                return jsonify({
+                    'success': False,
+                    'error': 'Latitude and longitude must be valid numbers.',
+                }), 400
+            if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lon <= 180.0):
+                return jsonify({
+                    'success': False,
+                    'error': 'Latitude must be between -90 and 90, longitude between -180 and 180.',
+                }), 400
+        else:
+            lat, lon = _geocode_location(location_name)
+            if lat is None or lon is None:
+                return jsonify({
+                    'success': False,
+                    'error': f'Could not find coordinates for location: {location_name}. Please provide a more specific location name, or enter latitude and longitude.',
+                }), 400
         
         # Insert into database
         conn = get_db_connection()
@@ -778,6 +807,313 @@ def report_hazard():
             'success': False,
             'error': str(e)
         }), 500
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance between two points in kilometers."""
+    r = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1))
+        * math.cos(math.radians(lat2))
+        * math.sin(dlon / 2) ** 2
+    )
+    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+@app.route('/api/safe-points/cities', methods=['GET'])
+def get_safe_point_cities():
+    """Return cities from location_mapping for safe point browsing."""
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT city
+            FROM location_mapping
+            WHERE city IS NOT NULL AND TRIM(city) <> ''
+            ORDER BY city ASC
+            """
+        )
+        cities = [row[0] for row in cursor.fetchall()]
+        return jsonify({'success': True, 'cities': cities}), 200
+    except Exception as e:
+        logger.error(f"Error fetching safe-point cities: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        try:
+            if cursor:
+                cursor.close()
+        except Exception:
+            pass
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+
+
+@app.route('/api/safe-points', methods=['GET'])
+def get_safe_points_by_city():
+    """Return all safe points for a selected city."""
+    city = (request.args.get('city') or '').strip()
+    if not city:
+        return jsonify({'success': False, 'error': 'city query parameter is required'}), 400
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            """
+            SELECT safe_point_id, city, name, category, location, latitude, longitude
+            FROM safe_points
+            WHERE LOWER(city) = LOWER(%s)
+            ORDER BY
+                CASE category
+                    WHEN 'hospital' THEN 1
+                    WHEN 'police station' THEN 2
+                    WHEN 'fuel station' THEN 3
+                    WHEN 'car workshop' THEN 4
+                    ELSE 99
+                END,
+                name ASC
+            """,
+            (city,),
+        )
+        rows = cursor.fetchall()
+        return jsonify({
+            'success': True,
+            'city': city,
+            'count': len(rows),
+            'safe_points': rows,
+        }), 200
+    except Exception as e:
+        logger.error(f"Error fetching safe points for city {city}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        try:
+            if cursor:
+                cursor.close()
+        except Exception:
+            pass
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+
+
+@app.route('/api/safe-points/nearby', methods=['GET'])
+def get_nearby_safe_points():
+    """Return safe points within radius_km of current coordinates."""
+    try:
+        lat = float(request.args.get('lat'))
+        lon = float(request.args.get('lon'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'lat and lon are required numeric query params'}), 400
+
+    try:
+        radius_km = float(request.args.get('radius_km', '5'))
+    except (TypeError, ValueError):
+        radius_km = 5.0
+    radius_km = max(0.1, min(radius_km, 50.0))
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            """
+            SELECT safe_point_id, city, name, category, location, latitude, longitude
+            FROM safe_points
+            WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+            """
+        )
+        rows = cursor.fetchall()
+        nearby = []
+        for row in rows:
+            try:
+                slat = float(row.get('latitude'))
+                slon = float(row.get('longitude'))
+            except (TypeError, ValueError):
+                continue
+            dist = _haversine_km(lat, lon, slat, slon)
+            if dist > radius_km:
+                continue
+            row['distance_km'] = round(dist, 2)
+            nearby.append(row)
+
+        nearby.sort(key=lambda x: x.get('distance_km', 9999))
+        return jsonify({
+            'success': True,
+            'center': {'lat': lat, 'lon': lon},
+            'radius_km': radius_km,
+            'count': len(nearby),
+            'safe_points': nearby,
+        }), 200
+    except Exception as e:
+        logger.error(f"Error fetching nearby safe points: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        try:
+            if cursor:
+                cursor.close()
+        except Exception:
+            pass
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+
+
+@app.route('/api/hazards/nearby', methods=['GET'])
+def get_nearby_hazards():
+    """Return hazards within radius_km of current coordinates."""
+    try:
+        lat = float(request.args.get('lat'))
+        lon = float(request.args.get('lon'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'lat and lon are required numeric query params'}), 400
+
+    try:
+        radius_km = float(request.args.get('radius_km', '5'))
+    except (TypeError, ValueError):
+        radius_km = 5.0
+    radius_km = max(0.1, min(radius_km, 100.0))
+
+    hazards = []
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # NDMA AI alerts
+        cursor.execute(
+            """
+            SELECT alert_id, heading, description, severity, location_name, icon_type,
+                   latitude, longitude, advisory_url, scraped_at
+            FROM ndma_alerts_ai
+            WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+            ORDER BY scraped_at DESC
+            LIMIT 300
+            """
+        )
+        ndma_rows = cursor.fetchall()
+        for alert in ndma_rows:
+            try:
+                hlat = float(alert.get('latitude'))
+                hlon = float(alert.get('longitude'))
+            except (TypeError, ValueError):
+                continue
+            dist = _haversine_km(lat, lon, hlat, hlon)
+            if dist > radius_km:
+                continue
+            icon_type = (alert.get('icon_type') or 'roadblock').lower()
+            mapped_type = icon_type if icon_type in {
+                'landslide', 'flood', 'roadblock', 'snowfall', 'protest', 'accident'
+            } else 'roadblock'
+            severity = (alert.get('severity') or 'medium').lower()
+            if severity not in {'low', 'medium', 'high', 'critical'}:
+                severity = 'medium'
+            ts = alert.get('scraped_at')
+            if isinstance(ts, datetime):
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                ts_str = ts.isoformat()
+            else:
+                ts_str = datetime.now(timezone.utc).isoformat()
+
+            hazards.append({
+                'id': f"ndma_{alert.get('alert_id')}",
+                'type': mapped_type,
+                'severity': severity,
+                'timestamp': ts_str,
+                'source': 'NDMA',
+                'lat': hlat,
+                'lon': hlon,
+                'location': alert.get('location_name') or 'Unknown',
+                'description': alert.get('description') or '',
+                'advisory_url': alert.get('advisory_url'),
+                'advisory_type': alert.get('heading'),
+                'distance_km': round(dist, 2),
+            })
+
+        # User hazard reports
+        cursor.execute(
+            """
+            SELECT hazard_id, title, description, severity, location, latitude, longitude, reported_at
+            FROM hazard_reports
+            WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+            ORDER BY reported_at DESC
+            LIMIT 300
+            """
+        )
+        user_rows = cursor.fetchall()
+        for report in user_rows:
+            try:
+                hlat = float(report.get('latitude'))
+                hlon = float(report.get('longitude'))
+            except (TypeError, ValueError):
+                continue
+            dist = _haversine_km(lat, lon, hlat, hlon)
+            if dist > radius_km:
+                continue
+            severity = (report.get('severity') or 'medium').lower()
+            if severity not in {'low', 'medium', 'high', 'critical'}:
+                severity = 'medium'
+            ts = report.get('reported_at')
+            if isinstance(ts, datetime):
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                ts_str = ts.isoformat()
+            else:
+                ts_str = datetime.now(timezone.utc).isoformat()
+            hazards.append({
+                'id': f"user_{report.get('hazard_id')}",
+                'type': 'roadblock',
+                'severity': severity,
+                'timestamp': ts_str,
+                'source': 'You',
+                'lat': hlat,
+                'lon': hlon,
+                'location': report.get('location') or 'Unknown',
+                'description': report.get('description') or report.get('title') or '',
+                'advisory_url': None,
+                'advisory_type': report.get('title') or 'User Report',
+                'distance_km': round(dist, 2),
+            })
+
+        hazards.sort(key=lambda x: x.get('distance_km', 9999))
+        return jsonify({
+            'success': True,
+            'center': {'lat': lat, 'lon': lon},
+            'radius_km': radius_km,
+            'count': len(hazards),
+            'hazards': hazards,
+        }), 200
+    except Exception as e:
+        logger.error(f"Error fetching nearby hazards: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        try:
+            if cursor:
+                cursor.close()
+        except Exception:
+            pass
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
 
 def _geocode_location(location_name: str) -> tuple:
     """

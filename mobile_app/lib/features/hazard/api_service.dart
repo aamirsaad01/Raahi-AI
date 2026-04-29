@@ -45,26 +45,34 @@ class HazardApiService {
     }
   }
 
-  /// Submit a new hazard report
-  /// Location name will be geocoded to get coordinates automatically
+  /// Submit a new hazard report.
+  /// If [latitude] and [longitude] are both set, those coordinates are stored;
+  /// otherwise the backend geocodes [location] (Geoapify / OSM).
   Future<Map<String, dynamic>> reportHazard({
     required HazardType type,
     required Severity severity,
     required String location,
     required String title,
     String? description,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
+      final Map<String, dynamic> payload = {
+        'type': _hazardTypeToBackend(type),
+        'severity': severity.name,
+        'location': location,
+        'title': title,
+        'description': description,
+      };
+      if (latitude != null && longitude != null) {
+        payload['latitude'] = latitude;
+        payload['longitude'] = longitude;
+      }
       final response = await http.post(
         Uri.parse('$baseUrl/api/hazards/report'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'type': _hazardTypeToBackend(type),
-          'severity': severity.name,
-          'location': location,
-          'title': title,
-          'description': description,
-        }),
+        body: jsonEncode(payload),
       );
 
       if (response.statusCode == 201) {
