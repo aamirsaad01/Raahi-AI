@@ -1,12 +1,22 @@
 """
 Routing Service – Geoapify Route Matrix integration.
 
-Fetches an N×N driving-time / distance matrix for a set of POIs so the
-itinerary LLM can schedule realistic travel between locations.
+This module:
+
+1. Builds the pre-LLM N×N drive-time matrix and returns both the
+   markdown string injected into the prompt AND a coordinate-keyed cache
+   the agent can reuse after the LLM call (no second round-trip).
+2. Exposes a batched, parallel-chunked ``get_legs(pairs)`` helper so the
+   post-LLM transit recompute can fetch many legs in **one** request
+   instead of one HTTP call per leg.
+3. Keeps the legacy ``get_poi_matrix`` and ``get_drive_leg_minutes_km``
+   entry points so existing callers keep working.
 """
 
 import logging
+import math
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
 import requests
@@ -22,10 +32,29 @@ logger = logging.getLogger(__name__)
 _MATRIX_URL = "https://api.geoapify.com/v1/routematrix"
 _REQUEST_TIMEOUT = 30  # seconds
 
+# Geoapify route-matrix size cap per request.  Larger sets get chunked
+# and dispatched in parallel.
+_MAX_MATRIX_POINTS = 25
+# Max simultaneous Geoapify requests when chunking.
+_MAX_CONCURRENCY = 4
+
+# Below this distance we skip the API entirely and use haversine +
+# heuristic speed — far cheaper and indistinguishable for short legs.
+SHORT_LEG_KM = 2.0
+# Average drive speed (km/h) used to convert km → minutes when falling
+# back to haversine.
+HEURISTIC_KMH = 35.0
+
+# (la1, lo1, la2, lo2) rounded keys -> (minutes, kilometres).
+LegCache = Dict[Tuple[float, float, float, float], Tuple[int, float]]
+
+
+def _coord_key(la1: float, lo1: float, la2: float, lo2: float) -> Tuple[float, float, float, float]:
+    return (round(la1, 6), round(lo1, 6), round(la2, 6), round(lo2, 6))
+
 
 class RoutingService:
-    """Wraps the Geoapify Route Matrix API to produce a human-readable
-    drive-time matrix that can be injected into an LLM prompt."""
+    """Wraps the Geoapify Route Matrix API."""
 
     def __init__(self):
         self.api_key: str = os.getenv("GEOAPIFY_API_KEY", "")
@@ -37,29 +66,85 @@ class RoutingService:
     # ------------------------------------------------------------------
 
     def get_poi_matrix(self, pois: List[Dict]) -> str:
-        """Return a markdown-formatted drive-time matrix for *pois*.
+        """Backward-compatible wrapper that only returns the markdown matrix."""
+        matrix_str, _ = self.get_poi_matrix_with_cache(pois)
+        return matrix_str
 
-        Each dict in *pois* must contain at least ``name``, ``latitude``,
-        and ``longitude``.
-
-        On any failure (missing key, API error, timeout) the method logs a
-        warning and returns an empty string so the caller can fall back to
-        pure LLM estimation.
+    def get_poi_matrix_with_cache(self, pois: List[Dict]) -> Tuple[str, LegCache]:
+        """Compute the POI drive matrix once and return both the prompt
+        string and a coordinate-keyed leg cache for the post-LLM
+        recompute step.
         """
         if not self.api_key:
             logger.info("No Geoapify key – skipping route matrix")
-            return ""
+            return "", {}
 
         coords = self._extract_coords(pois)
         if len(coords) < 2:
             logger.info("Fewer than 2 geo-located POIs – skipping matrix")
-            return ""
+            return "", {}
 
         raw_matrix = self._call_matrix_api(coords)
         if raw_matrix is None:
-            return ""
+            return "", {}
 
-        return self._format_matrix(pois, coords, raw_matrix)
+        matrix_str = self._format_matrix(pois, coords, raw_matrix)
+        cache = self._build_cache_from_matrix(coords, raw_matrix)
+        return matrix_str, cache
+
+    def get_legs(
+        self, pairs: List[Tuple[float, float, float, float]]
+    ) -> List[Optional[Tuple[int, float]]]:
+        """Batched + parallel leg lookup.
+
+        For each ``(la1, lo1, la2, lo2)`` in *pairs* returns ``(mins, km)``
+        or ``None``.  Duplicates points across pairs are deduplicated so
+        many legs typically resolve to one (or a few chunked + parallel)
+        Geoapify matrix calls.  Falls back to haversine when the API is
+        unavailable.
+        """
+        results: List[Optional[Tuple[int, float]]] = [None] * len(pairs)
+        if not pairs:
+            return results
+
+        if not self.api_key:
+            return [self._haversine_leg(*p) for p in pairs]
+
+        # Dedupe unique points across all pairs and assign each a matrix
+        # index we can later look up.
+        point_to_idx: Dict[Tuple[float, float], int] = {}
+        for la1, lo1, la2, lo2 in pairs:
+            for la, lo in ((la1, lo1), (la2, lo2)):
+                key = (round(la, 6), round(lo, 6))
+                if key not in point_to_idx:
+                    point_to_idx[key] = len(point_to_idx)
+
+        ordered_points = sorted(point_to_idx.items(), key=lambda kv: kv[1])
+        coords = [
+            {"idx": i, "name": f"P{i}", "lon": lo, "lat": la}
+            for (la, lo), i in ordered_points
+        ]
+
+        if len(coords) <= _MAX_MATRIX_POINTS:
+            raw_matrix = self._call_matrix_api(coords)
+            cache: LegCache = (
+                self._build_cache_from_matrix(coords, raw_matrix)
+                if raw_matrix
+                else {}
+            )
+        else:
+            cache = self._call_matrix_in_chunks(coords)
+
+        for i, (la1, lo1, la2, lo2) in enumerate(pairs):
+            cached = cache.get(_coord_key(la1, lo1, la2, lo2))
+            if cached is not None:
+                results[i] = cached
+            else:
+                # API gave us nothing for this pair (chunk boundary, dead
+                # cell, etc) – haversine fallback so the leg still has
+                # realistic numbers.
+                results[i] = self._haversine_leg(la1, lo1, la2, lo2)
+        return results
 
     def get_drive_leg_minutes_km(
         self,
@@ -68,38 +153,90 @@ class RoutingService:
         lat2: float,
         lon2: float,
     ) -> Optional[Tuple[int, float]]:
-        """Driving time (minutes) and distance (km) between two WGS84 points.
+        """Single-leg lookup kept for backward compatibility."""
+        legs = self.get_legs([(float(lat1), float(lon1), float(lat2), float(lon2))])
+        return legs[0] if legs else None
 
-        Uses a 2×2 Geoapify Route Matrix (source 0 → target 1).
-        """
-        if not self.api_key:
-            return None
+    @staticmethod
+    def haversine_km(la1: float, lo1: float, la2: float, lo2: float) -> float:
+        """Great-circle distance in kilometres."""
+        r = 6371.0
+        dlat = math.radians(la2 - la1)
+        dlon = math.radians(lo2 - lo1)
+        a = (
+            math.sin(dlat / 2) ** 2
+            + math.cos(math.radians(la1))
+            * math.cos(math.radians(la2))
+            * math.sin(dlon / 2) ** 2
+        )
+        return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
-        coords = [
-            {"idx": 0, "name": "a", "lon": float(lon1), "lat": float(lat1)},
-            {"idx": 1, "name": "b", "lon": float(lon2), "lat": float(lat2)},
-        ]
-        raw_matrix = self._call_matrix_api(coords)
-        if raw_matrix is None or len(raw_matrix) < 2:
-            return None
-        try:
-            cell = raw_matrix[0][1]
-            dist_m = cell.get("distance")
-            time_s = cell.get("time")
-        except (IndexError, TypeError, AttributeError):
-            return None
-        if dist_m is None or time_s is None:
-            return None
-        if dist_m == 0 and time_s == 0:
-            return None
-
-        dist_km = round(dist_m / 1000, 1)
-        time_min = max(1, round(time_s / 60))
-        return time_min, dist_km
+    @classmethod
+    def haversine_leg(cls, la1: float, lo1: float, la2: float, lo2: float) -> Tuple[int, float]:
+        """Haversine distance + heuristic-speed minutes."""
+        km = cls.haversine_km(la1, lo1, la2, lo2)
+        mins = max(5, int(round(km / HEURISTIC_KMH * 60)))
+        return mins, round(km, 1)
 
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
+
+    def _haversine_leg(self, la1: float, lo1: float, la2: float, lo2: float) -> Tuple[int, float]:
+        return self.haversine_leg(la1, lo1, la2, lo2)
+
+    def _call_matrix_in_chunks(self, coords: List[Dict]) -> LegCache:
+        """Split a large coord set into chunks and call Geoapify in parallel."""
+        chunks: List[List[Dict]] = []
+        step = _MAX_MATRIX_POINTS
+        for i in range(0, len(coords), step):
+            chunks.append(coords[i:i + step])
+
+        merged: LegCache = {}
+        with ThreadPoolExecutor(max_workers=_MAX_CONCURRENCY) as pool:
+            futures = {pool.submit(self._call_matrix_api, c): c for c in chunks}
+            for fut in as_completed(futures):
+                chunk_coords = futures[fut]
+                try:
+                    raw = fut.result()
+                except Exception as exc:
+                    logger.warning("Geoapify matrix chunk failed: %s", exc)
+                    raw = None
+                if not raw:
+                    continue
+                merged.update(self._build_cache_from_matrix(chunk_coords, raw))
+        return merged
+
+    @staticmethod
+    def _build_cache_from_matrix(
+        coords: List[Dict],
+        matrix: List[List[Dict]],
+    ) -> LegCache:
+        """Convert the raw Geoapify matrix into a coord-keyed cache."""
+        cache: LegCache = {}
+        n = len(coords)
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    continue
+                try:
+                    cell = matrix[i][j]
+                    dist_m = cell.get("distance")
+                    time_s = cell.get("time")
+                except (IndexError, TypeError, AttributeError):
+                    continue
+                if dist_m is None or time_s is None:
+                    continue
+                if dist_m == 0 and time_s == 0:
+                    continue
+                la1 = float(coords[i]["lat"])
+                lo1 = float(coords[i]["lon"])
+                la2 = float(coords[j]["lat"])
+                lo2 = float(coords[j]["lon"])
+                mins = max(1, int(round(time_s / 60)))
+                km = round(dist_m / 1000, 1)
+                cache[_coord_key(la1, lo1, la2, lo2)] = (mins, float(km))
+        return cache
 
     @staticmethod
     def _extract_coords(pois: List[Dict]) -> List[Dict]:

@@ -22,7 +22,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from api.utils.db_helper import DatabaseHelper
 from api.services.poi_matcher import POIMatcher
-from api.services.routing_service import RoutingService
+from api.services.routing_service import (
+    HEURISTIC_KMH,
+    SHORT_LEG_KM,
+    LegCache,
+    RoutingService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +259,7 @@ class ItineraryAgent:
         )
 
         hazards = self._retrieve_hazards(location)
-        transit_matrix = self.routing.get_poi_matrix(pois)
+        transit_matrix, leg_cache = self.routing.get_poi_matrix_with_cache(pois)
 
         user_prompt = self._build_user_prompt(
             user_prefs, pois, hazards, location, transit_matrix
@@ -263,7 +268,7 @@ class ItineraryAgent:
         raw_json = self._call_llm(user_prompt)
         itinerary_payload = self._parse_and_validate(raw_json, pois)
         self._enrich_slots_with_coordinates(itinerary_payload, pois)
-        self._recompute_transit_from_slot_coordinates(itinerary_payload)
+        self._recompute_transit_from_slot_coordinates(itinerary_payload, leg_cache)
         itinerary_id = self._persist(itinerary_payload, user_prefs, location)
 
         return {
@@ -316,7 +321,7 @@ class ItineraryAgent:
         primary_location = self._primary_location_from_corridor(corridor)
         hazards = self._retrieve_hazards(primary_location) if primary_location else []
 
-        transit_matrix = self.routing.get_poi_matrix(pois)
+        transit_matrix, leg_cache = self.routing.get_poi_matrix_with_cache(pois)
 
         user_prompt = self._build_corridor_prompt(
             user_prefs, pois, hazards, corridor, transit_matrix
@@ -325,7 +330,7 @@ class ItineraryAgent:
         raw_json = self._call_llm(user_prompt)
         itinerary_payload = self._parse_and_validate(raw_json, pois)
         self._enrich_slots_with_coordinates(itinerary_payload, pois)
-        self._recompute_transit_from_slot_coordinates(itinerary_payload)
+        self._recompute_transit_from_slot_coordinates(itinerary_payload, leg_cache)
 
         # Persist using the first stop as the "destination" for DB compat
         dest_city = corridor["stops"][0]["city"] if corridor.get("stops") else "Road Trip"
@@ -993,12 +998,34 @@ Generate the itinerary JSON now.
                     slot["latitude"] = None
                     slot["longitude"] = None
 
-    def _recompute_transit_from_slot_coordinates(self, payload: Dict) -> None:
-        """Overwrite per-slot transit metrics using Geoapify (or haversine fallback).
+    def _recompute_transit_from_slot_coordinates(
+        self,
+        payload: Dict,
+        leg_cache: Optional[LegCache] = None,
+    ) -> None:
+        """Overwrite per-slot transit metrics from real slot coordinates.
 
-        The LLM often emits identical ``transit_*`` values for every leg; this
-        derives duration and distance from consecutive slot coordinates.
+        Optimised pipeline (replaces the old serial Geoapify-per-leg loop):
+
+        1. **Reuse the pre-LLM matrix** — any leg whose endpoints are
+           already in *leg_cache* is filled in instantly with no HTTP
+           call.
+        2. **Short-leg haversine fast path** — legs shorter than
+           ``SHORT_LEG_KM`` use haversine + heuristic speed and skip
+           the API entirely.
+        3. **Batched + parallel routing call** — every remaining leg is
+           collected, deduplicated, and sent to Geoapify in a single
+           batched call (chunked + parallel internally for large sets).
+        4. **Haversine fallback** — any leg the API still cannot answer
+           is filled from haversine so output is never partial.
         """
+        leg_cache = leg_cache or {}
+
+        # Stage 1: walk every leg, resolve what we can locally, queue
+        # the rest for one batched API call.
+        pending_slots: List[Dict] = []
+        pending_pairs: List[Tuple[float, float, float, float]] = []
+
         for day in payload.get("days", []) or []:
             if not isinstance(day, dict):
                 continue
@@ -1014,16 +1041,55 @@ Generate the itinerary JSON now.
                     cur["transit_from_previous_mins"] = 1
                     cur["transit_distance_km"] = 0.0
                     continue
-                leg = self.routing.get_drive_leg_minutes_km(la1, lo1, la2, lo2)
-                if leg is not None:
-                    mins, km = leg
+
+                # 1) Reuse pre-LLM matrix cache (no extra HTTP).
+                cached = leg_cache.get(
+                    (round(la1, 6), round(lo1, 6), round(la2, 6), round(lo2, 6))
+                )
+                if cached is not None:
+                    mins, km = cached
                     cur["transit_from_previous_mins"] = int(mins)
                     cur["transit_distance_km"] = float(km)
-                else:
-                    km = ItineraryAgent._haversine_km(la1, lo1, la2, lo2)
-                    est_min = max(5, int(round(km / 35.0 * 60)))
+                    continue
+
+                # 2) Cheap path for very short legs.
+                km_h = ItineraryAgent._haversine_km(la1, lo1, la2, lo2)
+                if km_h <= SHORT_LEG_KM:
+                    est_min = max(5, int(round(km_h / HEURISTIC_KMH * 60)))
                     cur["transit_from_previous_mins"] = est_min
-                    cur["transit_distance_km"] = round(km, 1)
+                    cur["transit_distance_km"] = round(km_h, 1)
+                    continue
+
+                # 3) Queue for batched API call.
+                pending_slots.append(cur)
+                pending_pairs.append((la1, lo1, la2, lo2))
+
+        if not pending_pairs:
+            return
+
+        # Stage 2: one batched + parallel-chunked Geoapify call for every
+        # remaining leg (with internal haversine fallback per pair).
+        try:
+            legs = self.routing.get_legs(pending_pairs)
+        except Exception as exc:
+            logger.warning(
+                "Routing batch failed (%s) – falling back to haversine for %d legs",
+                exc,
+                len(pending_pairs),
+            )
+            legs = [None] * len(pending_pairs)
+
+        for slot, pair, result in zip(pending_slots, pending_pairs, legs):
+            if result is not None:
+                mins, km = result
+                slot["transit_from_previous_mins"] = int(mins)
+                slot["transit_distance_km"] = float(km)
+                continue
+            la1, lo1, la2, lo2 = pair
+            km = ItineraryAgent._haversine_km(la1, lo1, la2, lo2)
+            est_min = max(5, int(round(km / HEURISTIC_KMH * 60)))
+            slot["transit_from_previous_mins"] = est_min
+            slot["transit_distance_km"] = round(km, 1)
 
     @staticmethod
     def _slot_lat_lon(slot: Dict) -> Tuple[Optional[float], Optional[float]]:
