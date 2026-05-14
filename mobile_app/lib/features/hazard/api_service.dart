@@ -1,13 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile_app/config/api_config.dart';
+
 import 'models.dart';
 
 class HazardApiService {
-  // Change this to your backend URL
-  // For local testing: 'http://localhost:5000' or 'http://127.0.0.1:5000'
-  // For Android emulator: 'http://10.0.2.2:5000'
-  static const String baseUrl = 'https://coronary-haste-zombie.ngrok-free.dev';
-
   /// Get all hazards (NDMA alerts + user reports)
   /// 
   /// [source] - Filter by source: 'ndma', 'user', 'pmd', or null for all
@@ -24,7 +21,7 @@ class HazardApiService {
       if (severity != null) queryParams['severity'] = severity;
       queryParams['time_window'] = timeWindow;
 
-      final uri = Uri.parse('$baseUrl/api/hazards').replace(queryParameters: queryParams);
+      final uri = Uri.parse('${ApiConfig.baseUrl}/api/hazards').replace(queryParameters: queryParams);
       
       final response = await http.get(uri);
 
@@ -70,7 +67,7 @@ class HazardApiService {
         payload['longitude'] = longitude;
       }
       final response = await http.post(
-        Uri.parse('$baseUrl/api/hazards/report'),
+        Uri.parse('${ApiConfig.baseUrl}/api/hazards/report'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
       );
@@ -91,7 +88,7 @@ class HazardApiService {
   Future<List<HazardReport>> getMyReports() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/hazards/my-reports'),
+        Uri.parse('${ApiConfig.baseUrl}/api/hazards/my-reports'),
       );
 
       if (response.statusCode == 200) {
@@ -116,7 +113,7 @@ class HazardApiService {
   Future<Map<String, dynamic>> refreshHazards() async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/hazards/refresh'),
+        Uri.parse('${ApiConfig.baseUrl}/api/hazards/refresh'),
         headers: {'Content-Type': 'application/json'},
       );
 

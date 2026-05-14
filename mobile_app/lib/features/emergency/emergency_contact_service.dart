@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile_app/config/api_config.dart';
 
 class EmergencyContactRecord {
   final int contactId;
@@ -28,8 +29,6 @@ class EmergencyContactRecord {
 }
 
 class EmergencyContactService {
-  static const String baseUrl = 'https://coronary-haste-zombie.ngrok-free.dev';
-
   Future<void> saveForItinerary({
     required int itineraryId,
     required String contactName,
@@ -37,7 +36,7 @@ class EmergencyContactService {
     required String phoneNumber,
   }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/api/emergency/contacts'),
+      Uri.parse('${ApiConfig.baseUrl}/api/emergency/contacts'),
       headers: <String, String>{'Content-Type': 'application/json'},
       body: jsonEncode(<String, dynamic>{
         'itinerary_id': itineraryId,
@@ -52,7 +51,7 @@ class EmergencyContactService {
   }
 
   Future<EmergencyContactRecord?> getLatestLinkedForUser(int userId) async {
-    final uri = Uri.parse('$baseUrl/api/emergency/linked-contact')
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/emergency/linked-contact')
         .replace(queryParameters: <String, String>{'user_id': '$userId'});
     final response = await http.get(uri);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -69,7 +68,7 @@ class EmergencyContactService {
   Future<List<EmergencyContactRecord>> getContactsForLatestItineraryForUser(
     int userId,
   ) async {
-    final uri = Uri.parse('$baseUrl/api/emergency/contacts')
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/emergency/contacts')
         .replace(queryParameters: <String, String>{'user_id': '$userId'});
     final response = await http.get(uri);
     final body = jsonDecode(response.body) as Map<String, dynamic>;

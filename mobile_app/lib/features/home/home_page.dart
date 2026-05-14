@@ -1,4 +1,7 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../routes/app_routes.dart';
 import '../auth/auth_session.dart';
 import '../auth/models.dart';
@@ -218,7 +221,10 @@ class _HomePageState extends State<HomePage> {
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (BuildContext context, int index) {
-                    return _ActionCard(action: actions[index]);
+                    return _ActionCard(
+                      action: actions[index],
+                      index: index,
+                    );
                   },
                   childCount: actions.length,
                 ),
@@ -284,6 +290,14 @@ class _CircleIconButton extends StatelessWidget {
   }
 }
 
+/// Hero "Craft your journey" card with real frosted-glass treatment.
+///
+/// Glassmorphism needs **content behind the blur** — without it,
+/// `BackdropFilter` has nothing to diffuse and the result looks identical
+/// to a flat gradient.  So we paint vivid teal + orange "blobs" inside
+/// the card's clip, then put a [BackdropFilter] on top.  The blur smears
+/// those blobs into a soft teal → orange wash; a translucent white veil
+/// and a hairline white border give it the signature glass feel.
 class _FeaturedCard extends StatelessWidget {
   final VoidCallback onTap;
   const _FeaturedCard({required this.onTap});
@@ -292,109 +306,187 @@ class _FeaturedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ColorScheme colors = Theme.of(context).colorScheme;
     final TextTheme text = Theme.of(context).textTheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Ink(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              colors.primary,
-              Color.alphaBlend(
-                colors.secondary.withValues(alpha: 0.55),
-                colors.primary,
-              ),
-            ],
+    const BorderRadius radius = BorderRadius.all(Radius.circular(24));
+
+    return ClipRRect(
+      borderRadius: radius,
+      child: Stack(
+        children: <Widget>[
+          // ── Solid teal (primary) base ──────────────────────────────
+          Positioned.fill(
+            child: ColoredBox(color: colors.primary),
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+
+          // ── Frosted glass overlay (subtle veil + edge) ─────────────
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: <Color>[
+                      Colors.white.withValues(alpha: 0.10),
+                      Colors.white.withValues(alpha: 0.02),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.32),
+                    width: 1.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Subtle inner highlight along the top edge — typical glass cue.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: <Color>[
+                    Colors.white.withValues(alpha: 0.0),
+                    Colors.white.withValues(alpha: 0.55),
+                    Colors.white.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ── Tap target + foreground content ────────────────────────
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: radius,
+              splashColor: Colors.white.withValues(alpha: 0.14),
+              highlightColor: Colors.white.withValues(alpha: 0.05),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
                   children: <Widget>[
-                    Text(
-                      'CRAFT YOUR JOURNEY',
-                      style: text.labelSmall?.copyWith(
-                        letterSpacing: 2.2,
-                        color: colors.onPrimary.withValues(alpha: 0.85),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'A trip tuned to your mood.',
-                      style: text.titleLarge?.copyWith(
-                        color: colors.onPrimary,
-                        height: 1.15,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Let AI design a route, day by day.',
-                      style: text.bodyMedium?.copyWith(
-                        color: colors.onPrimary.withValues(alpha: 0.85),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colors.onPrimary,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            'Plan a trip',
-                            style: text.labelLarge?.copyWith(
-                              color: colors.primary,
+                            'CRAFT YOUR JOURNEY',
+                            style: text.labelSmall?.copyWith(
+                              letterSpacing: 2.2,
+                              color: Colors.white.withValues(alpha: 0.9),
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 16,
-                            color: colors.primary,
+                          const SizedBox(height: 10),
+                          Text(
+                            'A trip tuned to your mood.',
+                            style: text.titleLarge?.copyWith(
+                              color: Colors.white,
+                              height: 1.15,
+                              shadows: <Shadow>[
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.18),
+                                  blurRadius: 6,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Let AI design a route, day by day.',
+                            style: text.bodyMedium?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.92),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          // Glass "Plan a trip" pill — same frost recipe.
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(
+                                sigmaX: 14,
+                                sigmaY: 14,
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 9,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.92),
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: Colors.white
+                                        .withValues(alpha: 0.6),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    Text(
+                                      'Plan a trip',
+                                      style: text.labelLarge?.copyWith(
+                                        color: colors.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Icon(
+                                      Icons.arrow_forward_rounded,
+                                      size: 16,
+                                      color: colors.primary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Glass sparkle circle.
+                    ClipOval(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: 0.18),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.45),
+                              width: 1,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: colors.onPrimary.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.auto_awesome,
-                  color: colors.onPrimary,
-                  size: 28,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
+
 
 class _HomeAction {
   final String title;
@@ -410,18 +502,54 @@ class _HomeAction {
   });
 }
 
-class _ActionCard extends StatelessWidget {
+class _ActionCard extends StatefulWidget {
   final _HomeAction action;
+  final int index;
 
-  const _ActionCard({required this.action});
+  const _ActionCard({
+    required this.action,
+    required this.index,
+  });
+
+  @override
+  State<_ActionCard> createState() => _ActionCardState();
+}
+
+class _ActionCardState extends State<_ActionCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pressController;
+  late Animation<double> _pressScale;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 95),
+    );
+    _pressScale = Tween<double>(begin: 1.0, end: 0.96).animate(
+      CurvedAnimation(parent: _pressController, curve: Curves.easeOutCubic),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pressController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme colors = theme.colorScheme;
     final TextTheme text = theme.textTheme;
-    return InkWell(
+    final _HomeAction action = widget.action;
+
+    final Widget tile = InkWell(
       borderRadius: BorderRadius.circular(20),
+      onTapDown: (_) => _pressController.forward(),
+      onTapUp: (_) => _pressController.reverse(),
+      onTapCancel: () => _pressController.reverse(),
       onTap: () => Navigator.of(context).pushNamed(action.route),
       child: Ink(
         decoration: BoxDecoration(
@@ -465,6 +593,28 @@ class _ActionCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    return ScaleTransition(
+      scale: _pressScale,
+      child: tile
+          .animate(delay: (42 * widget.index).ms)
+          .fadeIn(
+            duration: 400.ms,
+            curve: Curves.easeOutCubic,
+          )
+          .slideY(
+            begin: 0.06,
+            end: 0,
+            duration: 400.ms,
+            curve: Curves.easeOutCubic,
+          )
+          .scale(
+            begin: const Offset(0.94, 0.94),
+            end: const Offset(1, 1),
+            duration: 400.ms,
+            curve: Curves.easeOutCubic,
+          ),
     );
   }
 }

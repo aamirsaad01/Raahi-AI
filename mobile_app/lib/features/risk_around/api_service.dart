@@ -1,16 +1,16 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile_app/config/api_config.dart';
+
 import '../hazard/models.dart';
 
 class RiskAroundApiService {
-  static const String baseUrl = 'https://coronary-haste-zombie.ngrok-free.dev';
-
   Future<List<HazardReport>> scanNearbyHazards({
     required double lat,
     required double lon,
     double radiusKm = 5,
   }) async {
-    final uri = Uri.parse('$baseUrl/api/hazards/nearby').replace(
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/hazards/nearby').replace(
       queryParameters: <String, String>{
         'lat': lat.toString(),
         'lon': lon.toString(),

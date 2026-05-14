@@ -1,17 +1,16 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile_app/config/api_config.dart';
 
 import 'models.dart';
 
 class AuthService {
-  static const String baseUrl = 'https://coronary-haste-zombie.ngrok-free.dev';
-
   Future<AuthUser> login({
     required String email,
     required String password,
   }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/api/auth/login'),
+      Uri.parse('${ApiConfig.baseUrl}/api/auth/login'),
       headers: <String, String>{'Content-Type': 'application/json'},
       body: jsonEncode(<String, dynamic>{
         'email': email.trim(),
@@ -35,7 +34,7 @@ class AuthService {
     String medicalConditions = '',
   }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/api/auth/register'),
+      Uri.parse('${ApiConfig.baseUrl}/api/auth/register'),
       headers: <String, String>{'Content-Type': 'application/json'},
       body: jsonEncode(<String, dynamic>{
         'name': name.trim(),
@@ -53,7 +52,7 @@ class AuthService {
   }
 
   Future<List<AuthUser>> getAllUsers({required String adminEmail}) async {
-    final uri = Uri.parse('$baseUrl/api/auth/users').replace(
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/auth/users').replace(
       queryParameters: <String, String>{'admin_email': adminEmail},
     );
     final response = await http.get(uri);
@@ -74,7 +73,7 @@ class AuthService {
   }) async {
     final payload = <String, dynamic>{...updates, 'admin_email': adminEmail};
     final response = await http.put(
-      Uri.parse('$baseUrl/api/auth/users/$userId'),
+      Uri.parse('${ApiConfig.baseUrl}/api/auth/users/$userId'),
       headers: <String, String>{'Content-Type': 'application/json'},
       body: jsonEncode(payload),
     );
@@ -88,7 +87,7 @@ class AuthService {
     required String adminEmail,
   }) async {
     final response = await http.delete(
-      Uri.parse('$baseUrl/api/auth/users/$userId'),
+      Uri.parse('${ApiConfig.baseUrl}/api/auth/users/$userId'),
       headers: <String, String>{'Content-Type': 'application/json'},
       body: jsonEncode(<String, dynamic>{'admin_email': adminEmail}),
     );

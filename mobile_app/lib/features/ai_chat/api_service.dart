@@ -1,14 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile_app/config/api_config.dart';
 
 import 'models.dart';
 
 class AiChatApiService {
-  static const String baseUrl = 'https://coronary-haste-zombie.ngrok-free.dev';
-
   /// Resume the chat thread tied to the user's latest itinerary (if any).
   Future<Map<String, dynamic>> getActiveSession(int userId) async {
-    final uri = Uri.parse('$baseUrl/api/chat/active-session')
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/chat/active-session')
         .replace(queryParameters: <String, String>{'user_id': '$userId'});
     final response = await http.get(uri);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -25,7 +24,7 @@ class AiChatApiService {
     int? itineraryId,
   }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/api/chat/send'),
+      Uri.parse('${ApiConfig.baseUrl}/api/chat/send'),
       headers: <String, String>{'Content-Type': 'application/json'},
       body: jsonEncode(<String, dynamic>{
         'user_id': userId,
@@ -40,7 +39,7 @@ class AiChatApiService {
   }
 
   Future<List<ChatConversation>> getSessions(int userId) async {
-    final uri = Uri.parse('$baseUrl/api/chat/sessions')
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/chat/sessions')
         .replace(queryParameters: <String, String>{'user_id': '$userId'});
     final response = await http.get(uri);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -57,7 +56,7 @@ class AiChatApiService {
     required int userId,
     required int sessionId,
   }) async {
-    final uri = Uri.parse('$baseUrl/api/chat/sessions/$sessionId/messages')
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/chat/sessions/$sessionId/messages')
         .replace(queryParameters: <String, String>{'user_id': '$userId'});
     final response = await http.get(uri);
     final body = jsonDecode(response.body) as Map<String, dynamic>;

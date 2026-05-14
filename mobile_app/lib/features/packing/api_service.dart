@@ -1,13 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile_app/config/api_config.dart';
+
 import 'models.dart';
 
 class PackingApiService {
-  // Change this to your backend URL
-  // For local testing: 'http://localhost:5000' or 'http://127.0.0.1:5000'
-  // For Android emulator: 'http://10.0.2.2:5000'
-  static const String baseUrl = 'https://coronary-haste-zombie.ngrok-free.dev';
-
   /// Generate packing checklist from backend
   Future<PackingChecklistResponse> generateChecklist({
     required String region,
@@ -17,7 +14,7 @@ class PackingApiService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/checklist/generate'),
+        Uri.parse('${ApiConfig.baseUrl}/api/checklist/generate'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'region': region,
@@ -43,7 +40,7 @@ class PackingApiService {
   Future<List<String>> getRegions() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/regions'),
+        Uri.parse('${ApiConfig.baseUrl}/api/regions'),
       );
 
       if (response.statusCode == 200) {
@@ -61,7 +58,7 @@ class PackingApiService {
   Future<List<String>> getAreas(String region) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/areas?region=${Uri.encodeComponent(region)}'),
+        Uri.parse('${ApiConfig.baseUrl}/api/areas?region=${Uri.encodeComponent(region)}'),
       );
 
       if (response.statusCode == 200) {

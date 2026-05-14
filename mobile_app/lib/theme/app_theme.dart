@@ -3,10 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// Material 3 theme for the Raahi AI app.
 ///
-/// Style: **luxury minimal**.  Deep forest green as the seed colour gives
-/// every screen a calm, premium primary palette; the existing brand
-/// orange is preserved as the secondary/accent so CTAs, badges and the
-/// floating action button still feel like *Raahi*.
+/// Style: **luxury minimal**.  Primary brand teal (`#1C6D83`) drives the
+/// main surfaces, buttons, and nav; orange (`#EF7900`) is the accent for
+/// FABs, highlights, and secondary actions.
 ///
 /// Typography mixes a refined serif display face (`Playfair Display`)
 /// with a clean, modern sans body face (`Plus Jakarta Sans`) – the
@@ -15,8 +14,9 @@ import 'package:google_fonts/google_fonts.dart';
 class AppTheme {
   const AppTheme._();
 
-  // Brand seed + accent.
-  static const Color brandGreen = Color(0xFF184E2D);
+  /// Primary brand colour (teal — used as `ColorScheme.primary`).
+  static const Color brandPrimary = Color(0xFF1C6D83);
+  /// Accent orange (FAB, chips, secondary emphasis).
   static const Color brandOrange = Color(0xFFEF7900);
 
   static ThemeData light() => _build(Brightness.light);
@@ -26,14 +26,23 @@ class AppTheme {
     final bool isDark = brightness == Brightness.dark;
 
     final ColorScheme base = ColorScheme.fromSeed(
-      seedColor: brandGreen,
+      seedColor: brandPrimary,
       brightness: brightness,
     );
 
     final ColorScheme scheme = base.copyWith(
-      // Preserve the orange accent regardless of seed-derived palette.
+      primary: brandPrimary,
+      onPrimary: Colors.white,
+      primaryContainer: isDark
+          ? const Color(0xFF2A8BA8)
+          : const Color(0xFFD0E8EE),
+      onPrimaryContainer: isDark ? const Color(0xFFE8F4F8) : const Color(0xFF0A3A47),
       secondary: brandOrange,
       onSecondary: Colors.white,
+      secondaryContainer: isDark
+          ? const Color(0xFFB85C00)
+          : const Color(0xFFFFE0CC),
+      onSecondaryContainer: isDark ? const Color(0xFFFFF4EC) : const Color(0xFF5C2E00),
       tertiary: brandOrange,
       onTertiary: Colors.white,
       // Warm off-white in light mode, deep ink in dark mode.

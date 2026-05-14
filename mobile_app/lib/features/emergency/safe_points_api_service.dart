@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile_app/config/api_config.dart';
 
 class SafePoint {
   final int safePointId;
@@ -51,7 +52,6 @@ class SafePoint {
 }
 
 class SafePointsApiService {
-  static const String baseUrl = 'https://coronary-haste-zombie.ngrok-free.dev';
   static const String _geoapifyApiKey = String.fromEnvironment(
     'GEOAPIFY_API_KEY',
     defaultValue: '',
@@ -60,7 +60,7 @@ class SafePointsApiService {
 
   Future<List<String>> fetchCities() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/api/safe-points/cities'),
+      Uri.parse('${ApiConfig.baseUrl}/api/safe-points/cities'),
     );
     final Map<String, dynamic> body =
         jsonDecode(response.body) as Map<String, dynamic>;
@@ -73,7 +73,7 @@ class SafePointsApiService {
 
   Future<List<SafePoint>> fetchByCity(String city) async {
     final uri = Uri.parse(
-      '$baseUrl/api/safe-points',
+      '${ApiConfig.baseUrl}/api/safe-points',
     ).replace(queryParameters: <String, String>{'city': city});
     final response = await http.get(uri);
     final Map<String, dynamic> body =
@@ -94,7 +94,7 @@ class SafePointsApiService {
     required double longitude,
     double radiusKm = 5.0,
   }) async {
-    final uri = Uri.parse('$baseUrl/api/safe-points/nearby').replace(
+    final uri = Uri.parse('${ApiConfig.baseUrl}/api/safe-points/nearby').replace(
       queryParameters: <String, String>{
         'lat': latitude.toString(),
         'lon': longitude.toString(),

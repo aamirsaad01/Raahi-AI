@@ -1,13 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:mobile_app/config/api_config.dart';
+
 import 'models.dart';
 
 class ItineraryApiService {
-  // Change this to your backend URL
-  // For local testing: 'http://localhost:5000' or 'http://127.0.0.1:5000'
-  // For Android emulator: 'http://10.0.2.2:5000'
-  static const String baseUrl = 'https://coronary-haste-zombie.ngrok-free.dev'; // TODO: Paste the HTTPS Ngrok link here
-
   /// Get destination recommendations based on budget and mood
   Future<Map<String, dynamic>> recommendDestinations({
     required int budget,
@@ -20,7 +17,7 @@ class ItineraryApiService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/itinerary/recommend'),
+        Uri.parse('${ApiConfig.baseUrl}/api/itinerary/recommend'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'budget': budget,
@@ -81,7 +78,7 @@ class ItineraryApiService {
       }
       
       final response = await http.post(
-        Uri.parse('$baseUrl/api/itinerary/generate'),
+        Uri.parse('${ApiConfig.baseUrl}/api/itinerary/generate'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(requestBody),
       );
@@ -106,7 +103,7 @@ class ItineraryApiService {
   Future<TripItinerary> getItinerary(int itineraryId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/itinerary/$itineraryId'),
+        Uri.parse('${ApiConfig.baseUrl}/api/itinerary/$itineraryId'),
       );
 
       if (response.statusCode == 200) {
@@ -129,7 +126,7 @@ class ItineraryApiService {
   Future<List<TripItinerary>> getUserItineraries(int userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/api/itinerary/user/$userId'),
+        Uri.parse('${ApiConfig.baseUrl}/api/itinerary/user/$userId'),
       );
 
       if (response.statusCode == 200) {
