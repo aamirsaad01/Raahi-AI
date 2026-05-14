@@ -18,8 +18,8 @@ def main() -> None:
         repo_root,
         "database",
         "postgresql",
-        "migrations",
-        "add_chat_tables.sql",
+        "schema",
+        "09_chat.sql",
     )
     with open(sql_path, "r", encoding="utf-8") as f:
         sql = f.read()

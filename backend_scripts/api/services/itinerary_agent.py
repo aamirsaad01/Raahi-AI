@@ -252,6 +252,11 @@ class ItineraryAgent:
                 "terminal": True,
             }
 
+        # Cap to the top match-score POIs the LLM actually needs (≈ 3 per
+        # day).  `_retrieve_pois` already returns POIs sorted by score so
+        # the head of the list is the strongest match.
+        pois = self._cap_pois_for_llm(pois, days=user_prefs["days"])
+
         self._assign_visit_order(
             pois,
             start_lat=float(location["latitude"]),
@@ -367,15 +372,25 @@ class ItineraryAgent:
     def _retrieve_corridor_pois(
         self, corridor: Dict, prefs: Dict
     ) -> List[Dict]:
-        """Fetch ranked POIs for every stop on the corridor (no per-stop or total cap),
-        tagged with ``route_order`` and ``_city`` so the LLM can sequence them."""
+        """Fetch ranked POIs for every stop on the corridor.
+
+        Each stop receives a slice of the global ``days * 3`` budget so
+        the LLM prompt stays small while every city keeps at least one
+        POI when possible.  POIs are tagged with ``route_order`` and
+        ``_city`` so the LLM can sequence them along the corridor.
+        """
         all_pois: List[Dict] = []
 
         num_people = max(prefs.get("num_people", 1), 1)
         per_person_budget = prefs["budget"] / num_people
         prefs_copy = {**prefs, "budget": per_person_budget}
 
-        for stop in corridor.get("stops", []):
+        stops = corridor.get("stops", [])
+        num_stops = max(1, len(stops))
+        days = max(1, int(prefs.get("days", 1)))
+        allocations = self._allocate_total(days * 3, num_stops)
+
+        for idx, stop in enumerate(stops):
             loc_id = stop.get("location_id")
             if loc_id is None:
                 continue
@@ -393,6 +408,12 @@ class ItineraryAgent:
                     if score >= 15:
                         poi["match_score"] = round(score, 2)
                         ranked.append(poi)
+
+            # Cap this stop to its share of the global budget so the LLM
+            # only sees the top match-score POIs per city.
+            ranked.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+            stop_cap = max(1, allocations[idx] if idx < len(allocations) else 1)
+            ranked = ranked[:stop_cap]
 
             # Sort POIs within this stop geographically
             self._assign_visit_order(
@@ -412,6 +433,12 @@ class ItineraryAgent:
             p.get("route_order", 99),
             p.get("suggested_visit_order", 99),
         ))
+
+        # Safety net: even after per-stop caps, never exceed the global
+        # cap (rounding edge-cases or future allocation tweaks).
+        global_cap = days * 3
+        if len(all_pois) > global_cap:
+            all_pois = all_pois[:global_cap]
 
         # Re-assign a global visit order across the whole corridor
         for idx, p in enumerate(all_pois, 1):
@@ -466,6 +493,38 @@ class ItineraryAgent:
             ranked.sort(key=lambda x: x.get("match_score", 0), reverse=True)
 
         return ranked
+
+    # ------------------------------------------------------------------
+    # LLM-context helpers (capping + allocation)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _cap_pois_for_llm(pois: List[Dict], days: int) -> List[Dict]:
+        """Keep the top-ranked POIs only.
+
+        Aims for ``days * 3`` POIs total, which gives the LLM enough
+        attraction-based slots for 6–10 time slots per day (the rest
+        being meals, transit, rest, check-in/out).  Input is expected to
+        be sorted by ``match_score`` descending.
+        """
+        days = max(1, int(days))
+        return pois[: days * 3]
+
+    @staticmethod
+    def _allocate_total(total: int, n_buckets: int) -> List[int]:
+        """Distribute ``total`` slots across ``n_buckets``, front-loaded.
+
+        Examples::
+
+            _allocate_total(15, 3)  -> [5, 5, 5]
+            _allocate_total(15, 4)  -> [4, 4, 4, 3]
+            _allocate_total(9, 5)   -> [2, 2, 2, 2, 1]
+        """
+        if n_buckets <= 0:
+            return []
+        base = total // n_buckets
+        extra = total - base * n_buckets
+        return [base + 1 if i < extra else base for i in range(n_buckets)]
 
     # ------------------------------------------------------------------
     # Geographic visit-order sorting (nearest-neighbour heuristic)
@@ -641,21 +700,23 @@ class ItineraryAgent:
     # ------------------------------------------------------------------
 
     def _build_poi_summary(self, p: Dict) -> Dict:
-        """Shared POI → dict serialisation used by both prompt builders."""
+        """Compact POI payload used by both prompt builders.
+
+        Drops fields the LLM does not need for selection or slot text:
+        coordinates (re-attached post-LLM by ``_enrich_slots_with_coordinates``
+        via ``poi_id``), ``rating``, ``highlights``, ``difficulty`` and
+        ``best_months``.  ``description`` is also truncated more
+        aggressively – the model can elaborate from the name + category
+        in its own slot ``description`` field.
+        """
         summary: Dict = {
             "poi_id": p["poi_id"],
             "name": p["name"],
             "category": p.get("category", ""),
-            "description": (p.get("description") or "")[:300],
-            "rating": p.get("rating"),
+            "description": (p.get("description") or "")[:150],
             "estimated_cost_pkr": p.get("estimated_cost", "0"),
             "avg_duration_hours": p.get("avg_duration_hours", 2),
             "activities": p.get("activities", ""),
-            "highlights": p.get("highlights", []),
-            "difficulty": p.get("difficulty", "Easy"),
-            "best_months": p.get("best_months", ""),
-            "latitude": p.get("latitude"),
-            "longitude": p.get("longitude"),
         }
         if "suggested_visit_order" in p:
             summary["suggested_visit_order"] = p["suggested_visit_order"]

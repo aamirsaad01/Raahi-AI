@@ -98,8 +98,10 @@ class _FooterButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ColorScheme colors = Theme.of(context).colorScheme;
-    final Color bg = isActive ? Colors.white : Colors.transparent;
-    final Color fg = isActive ? colors.primary : Colors.white;
+    final Color bg = isActive ? colors.onPrimary : Colors.transparent;
+    final Color fg = isActive
+        ? colors.primary
+        : colors.onPrimary.withValues(alpha: 0.85);
     return Expanded(
       child: InkWell(
         borderRadius: BorderRadius.circular(24),

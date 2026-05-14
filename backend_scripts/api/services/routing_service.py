@@ -297,43 +297,46 @@ class RoutingService:
         coords: List[Dict],
         matrix: List[List[Dict]],
     ) -> str:
-        """Convert the raw NxN matrix into a concise markdown table the LLM
-        can reason over.
+        """Emit only the consecutive legs along the visit-order chain.
 
-        Produces lines like:
-            From Altit Fort → Attabad Lake: 45 min, 12.5 km
-        Only unique (i→j where i<j) pairs are emitted to keep prompt size
-        manageable.
+        ``coords`` preserves the order of geo-located POIs in ``pois``,
+        which – after :py:meth:`ItineraryAgent._assign_visit_order` – is
+        the planned visit sequence.  Emitting only neighbour pairs
+        (``i → i+1``) keeps the routing guidance the LLM actually uses
+        when scheduling sequentially while drastically shrinking prompt
+        tokens versus the previous all-pairs output.
+
+        The full matrix is still kept by the caller as a leg cache for
+        post-LLM transit recomputation, so route accuracy is unaffected.
         """
         lines: List[str] = []
         n = len(coords)
 
-        for i in range(n):
-            for j in range(i + 1, n):
-                try:
-                    cell = matrix[i][j]
-                    dist_m = cell.get("distance")
-                    time_s = cell.get("time")
-                except (IndexError, TypeError, AttributeError):
-                    continue
+        for i in range(n - 1):
+            try:
+                cell = matrix[i][i + 1]
+                dist_m = cell.get("distance")
+                time_s = cell.get("time")
+            except (IndexError, TypeError, AttributeError):
+                continue
 
-                if dist_m is None or time_s is None:
-                    continue
-                if dist_m == 0 and time_s == 0:
-                    continue
+            if dist_m is None or time_s is None:
+                continue
+            if dist_m == 0 and time_s == 0:
+                continue
 
-                dist_km = round(dist_m / 1000, 1)
-                time_min = max(1, round(time_s / 60))
+            dist_km = round(dist_m / 1000, 1)
+            time_min = max(1, round(time_s / 60))
 
-                src = coords[i]["name"]
-                dst = coords[j]["name"]
-                lines.append(f"• {src} → {dst}: {time_min} min, {dist_km} km")
+            src = coords[i]["name"]
+            dst = coords[i + 1]["name"]
+            lines.append(f"• {src} → {dst}: {time_min} min, {dist_km} km")
 
         if not lines:
             return ""
 
         header = (
-            "## Drive-Time Matrix (all POI pairs)\n"
-            "Distances and times are approximate driving estimates.\n\n"
+            "## Drive-Time Chain (consecutive visit-order legs)\n"
+            "Approximate driving estimates between each POI and the next.\n\n"
         )
         return header + "\n".join(lines)

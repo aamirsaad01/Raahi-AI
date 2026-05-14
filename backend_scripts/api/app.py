@@ -346,7 +346,9 @@ def get_hazards():
                 table_exists = result['exists'] if result else False
                 
                 if not table_exists:
-                    logger.warning("Table 'ndma_alerts_ai' does not exist. Please run create_ndma_ai_table.py")
+                    logger.warning(
+                        "Table 'ndma_alerts_ai' does not exist. Apply database/postgresql/db_init.sql (psql -f) on PostgreSQL."
+                    )
                     cursor.close()
                     conn.close()
                 else:
@@ -663,7 +665,7 @@ def get_hazards():
                 else:
                     response_data['diagnostics'] = {
                         'table_exists': False,
-                        'message': 'Table ndma_alerts_ai does not exist. Please run create_ndma_ai_table.py first.'
+                        'message': 'Table ndma_alerts_ai does not exist. Apply database/postgresql/db_init.sql (psql -f) on PostgreSQL.'
                     }
                 
                 cursor.close()

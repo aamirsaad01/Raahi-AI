@@ -17,8 +17,8 @@ def main() -> None:
         repo_root,
         "database",
         "postgresql",
-        "migrations",
-        "add_user_profile_and_admin.sql",
+        "schema",
+        "01_users.sql",
     )
     with open(sql_path, "r", encoding="utf-8") as f:
         sql = f.read()

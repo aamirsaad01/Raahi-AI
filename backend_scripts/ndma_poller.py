@@ -64,7 +64,7 @@ class NDMAPoller:
             exists = cursor.fetchone()[0]
             
             if not exists:
-                logger.warning("⚠️  ndma_alerts table does not exist. Please run add_ndma_alerts_table.sql first!")
+                logger.warning("⚠️  ndma_alerts table does not exist. Apply database/postgresql/db_init.sql (psql -f).")
                 cursor.close()
                 return False
             
@@ -115,7 +115,7 @@ class NDMAPoller:
         """Ensure the AI alerts table exists"""
         if not self._table_exists('ndma_alerts_ai'):
             logger.error("❌ ndma_alerts_ai table does NOT exist!")
-            logger.error("Please run: database/postgresql/update_ndma_alerts_ai_schema.sql")
+            logger.error("Please run: database/postgresql/db_init.sql (psql -f)")
             raise Exception("ndma_alerts_ai table not found. Run migration script first.")
         logger.info("✅ ndma_alerts_ai table exists")
     

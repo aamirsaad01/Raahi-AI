@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
+import 'theme/theme_controller.dart';
 import 'routes/app_routes.dart';
 import 'widgets/app_footer_nav.dart';
 import 'navigation/footer_route_observer.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Load persisted theme preference before the first frame so the user
+  // never sees a flash of the wrong mode on launch.
+  await ThemeController.instance.load();
   runApp(const MyApp());
 }
 
@@ -15,18 +20,20 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final FooterRouteObserver footerObserver = FooterRouteObserver();
     final GlobalKey<NavigatorState> navKey = GlobalKey<NavigatorState>();
-    return MaterialApp(
-      title: 'Raahi AI',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      themeMode: ThemeMode.light,
-      routes: AppRoutes.routes(),
-      onGenerateRoute: AppRoutes.onGenerateRoute,
-      initialRoute: AppRoutes.splash,
-      navigatorKey: navKey,
-      navigatorObservers: <NavigatorObserver>[footerObserver],
-      builder: (BuildContext context, Widget? child) {
+    return AnimatedBuilder(
+      animation: ThemeController.instance,
+      builder: (BuildContext context, _) => MaterialApp(
+        title: 'Raahi AI',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: ThemeController.instance.mode,
+        routes: AppRoutes.routes(),
+        onGenerateRoute: AppRoutes.onGenerateRoute,
+        initialRoute: AppRoutes.splash,
+        navigatorKey: navKey,
+        navigatorObservers: <NavigatorObserver>[footerObserver],
+        builder: (BuildContext context, Widget? child) {
         // Derive current tab from route name
         FooterTab? active;
         return ValueListenableBuilder<String?>(
@@ -124,6 +131,7 @@ class MyApp extends StatelessWidget {
           },
         );
       },
+      ),
     );
   }
 }

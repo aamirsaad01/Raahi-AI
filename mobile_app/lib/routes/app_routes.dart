@@ -41,6 +41,7 @@ import '../features/auth/login_page.dart';
 import '../features/auth/signup_page.dart';
 import '../features/auth/admin_users_page.dart';
 import '../features/risk_around/risk_around_page.dart';
+import '../features/settings/settings_page.dart';
 
 class AppRoutes {
   const AppRoutes._();
@@ -85,6 +86,7 @@ class AppRoutes {
   static const String packingResults = '/packing/results';
   static const String packingEdit = '/packing/edit';
   static const String packingSaved = '/packing/saved';
+  static const String appSettings = '/settings';
 
   static Map<String, WidgetBuilder> routes() {
     return <String, WidgetBuilder>{
@@ -155,6 +157,7 @@ class AppRoutes {
       aiChat: (BuildContext context) => const AiChatPage(),
       aiChatHistory: (BuildContext context) => const AiChatHistoryPage(),
       aiChatSettings: (BuildContext context) => const AiChatSettingsPage(),
+      appSettings: (BuildContext context) => const AppSettingsPage(),
     };
   }
 

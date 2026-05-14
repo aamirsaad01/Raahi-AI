@@ -20,98 +20,208 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadUser() async {
-    final user = await AuthSession.load();
+    final AuthUser? user = await AuthSession.load();
     if (!mounted) return;
     setState(() => _user = user);
   }
 
-  Future<void> _logout() async {
-    await AuthSession.clear();
-    if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.login,
-      (Route<dynamic> r) => false,
-    );
+  String _greeting() {
+    final int hour = DateTime.now().hour;
+    if (hour < 5) return 'Good night';
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    if (hour < 21) return 'Good evening';
+    return 'Good night';
+  }
+
+  String _firstName() {
+    final String? raw = _user?.name;
+    if (raw == null || raw.trim().isEmpty) return 'Traveller';
+    return raw.trim().split(RegExp(r'\s+')).first;
   }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final TextTheme textTheme = theme.textTheme;
+    final TextTheme text = theme.textTheme;
+    final ColorScheme colors = theme.colorScheme;
 
     final List<_HomeAction> actions = <_HomeAction>[
-      _HomeAction(
+      const _HomeAction(
         title: 'Mood Itinerary',
+        subtitle: 'Plan by feeling',
         icon: Icons.auto_awesome,
         route: AppRoutes.itinerary,
       ),
-      _HomeAction(
+      const _HomeAction(
         title: 'Packing Checklist',
+        subtitle: 'Smart, tailored lists',
         icon: Icons.checklist_rounded,
         route: AppRoutes.packing,
       ),
-      _HomeAction(
+      const _HomeAction(
         title: 'Hazard Map',
+        subtitle: 'Live alerts near you',
         icon: Icons.warning_amber_rounded,
         route: AppRoutes.hazardMap,
       ),
-      _HomeAction(
+      const _HomeAction(
         title: 'Risk Around Me',
+        subtitle: 'Scan my surroundings',
         icon: Icons.radar_rounded,
         route: AppRoutes.riskAround,
       ),
-      _HomeAction(
+      const _HomeAction(
         title: 'Emergency Mode',
+        subtitle: 'Offline-first SOS',
         icon: Icons.sos_rounded,
         route: AppRoutes.emergency,
       ),
-      _HomeAction(
-        title: 'AI Chat (Urdu)',
+      const _HomeAction(
+        title: 'AI Chat',
+        subtitle: 'Ask Raahi anything',
         icon: Icons.smart_toy_rounded,
         route: AppRoutes.aiChat,
       ),
+      const _HomeAction(
+        title: 'Collaboration',
+        subtitle: 'Plan with friends',
+        icon: Icons.groups_rounded,
+        route: AppRoutes.collaboration,
+      ),
     ];
 
-    final ColorScheme colors = theme.colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: colors.primary,
-        foregroundColor: Colors.white,
-        title: const Text('Raahi AI'),
-        actions: <Widget>[
-          if (_user?.isAdmin == true)
-            IconButton(
-              tooltip: 'Manage Users',
-              onPressed: () => Navigator.of(context).pushNamed(AppRoutes.adminUsers),
-              icon: const Icon(Icons.admin_panel_settings_outlined),
+      backgroundColor: colors.surface,
+      body: SafeArea(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: <Widget>[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Row(
+                  children: <Widget>[
+                    const _BrandMark(),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            'RAAHI',
+                            style: text.titleMedium?.copyWith(
+                              letterSpacing: 4,
+                              color: colors.onSurface,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Unpredictable Roads, Predictable Plans',
+                            style: text.labelSmall?.copyWith(
+                              color: colors.onSurface.withValues(alpha: 0.7),
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_user?.isAdmin == true)
+                      _CircleIconButton(
+                        icon: Icons.admin_panel_settings_outlined,
+                        tooltip: 'Manage Users',
+                        onTap: () => Navigator.of(context)
+                            .pushNamed(AppRoutes.adminUsers),
+                      ),
+                    if (_user?.isAdmin == true) const SizedBox(width: 8),
+                    _CircleIconButton(
+                      icon: Icons.settings_outlined,
+                      tooltip: 'Settings',
+                      onTap: () => Navigator.of(context)
+                          .pushNamed(AppRoutes.appSettings),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          IconButton(
-            tooltip: 'Logout',
-            onPressed: _logout,
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text('Your Travel Companion', style: textTheme.titleLarge),
-            const SizedBox(height: 12),
-            Expanded(
-              child: GridView.builder(
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      '${_greeting()},',
+                      style: text.bodyLarge?.copyWith(
+                        color: colors.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_firstName()}.',
+                      style: text.displaySmall?.copyWith(
+                        height: 1.05,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Where will today take you?',
+                      style: text.bodyMedium?.copyWith(
+                        color: colors.onSurface.withValues(alpha: 0.65),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                child: _FeaturedCard(
+                  onTap: () => Navigator.of(context)
+                      .pushNamed(AppRoutes.itinerary),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    Text(
+                      'Explore',
+                      style: text.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'Curated for you',
+                      style: text.bodySmall?.copyWith(
+                        color: colors.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 32),
+              sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.1,
+                  childAspectRatio: 0.95,
                 ),
-                itemCount: actions.length,
-                itemBuilder: (BuildContext context, int index) {
-                  final _HomeAction action = actions[index];
-                  return _ActionCard(action: action);
-                },
+                delegate: SliverChildBuilderDelegate(
+                  (BuildContext context, int index) {
+                    return _ActionCard(action: actions[index]);
+                  },
+                  childCount: actions.length,
+                ),
               ),
             ),
           ],
@@ -121,13 +231,180 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+class _BrandMark extends StatelessWidget {
+  const _BrandMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.asset(
+          'assets/raahi_logo.png',
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+}
+
+class _CircleIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  const _CircleIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 24,
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerHighest,
+            shape: BoxShape.circle,
+            border: Border.all(color: colors.outlineVariant),
+          ),
+          alignment: Alignment.center,
+          child: Icon(icon, size: 20, color: colors.onSurface),
+        ),
+      ),
+    );
+  }
+}
+
+class _FeaturedCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _FeaturedCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+    final TextTheme text = Theme.of(context).textTheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Ink(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[
+              colors.primary,
+              Color.alphaBlend(
+                colors.secondary.withValues(alpha: 0.55),
+                colors.primary,
+              ),
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'CRAFT YOUR JOURNEY',
+                      style: text.labelSmall?.copyWith(
+                        letterSpacing: 2.2,
+                        color: colors.onPrimary.withValues(alpha: 0.85),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'A trip tuned to your mood.',
+                      style: text.titleLarge?.copyWith(
+                        color: colors.onPrimary,
+                        height: 1.15,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Let AI design a route, day by day.',
+                      style: text.bodyMedium?.copyWith(
+                        color: colors.onPrimary.withValues(alpha: 0.85),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.onPrimary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            'Plan a trip',
+                            style: text.labelLarge?.copyWith(
+                              color: colors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 16,
+                            color: colors.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: colors.onPrimary.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.auto_awesome,
+                  color: colors.onPrimary,
+                  size: 28,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _HomeAction {
   final String title;
+  final String subtitle;
   final IconData icon;
   final String route;
 
   const _HomeAction({
     required this.title,
+    required this.subtitle,
     required this.icon,
     required this.route,
   });
@@ -140,24 +417,50 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme colors = Theme.of(context).colorScheme;
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme colors = theme.colorScheme;
+    final TextTheme text = theme.textTheme;
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       onTap: () => Navigator.of(context).pushNamed(action.route),
       child: Ink(
         decoration: BoxDecoration(
-          color: colors.surface,
-          borderRadius: BorderRadius.circular(16),
+          color: colors.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: colors.outlineVariant),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Icon(action.icon, size: 36, color: colors.primary),
-              const SizedBox(height: 12),
-              Text(action.title, textAlign: TextAlign.center),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: Icon(action.icon, color: colors.primary, size: 22),
+              ),
+              const Spacer(),
+              Text(
+                action.title,
+                style: text.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                action.subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: text.bodySmall?.copyWith(
+                  color: colors.onSurface.withValues(alpha: 0.65),
+                ),
+              ),
             ],
           ),
         ),
@@ -165,6 +468,3 @@ class _ActionCard extends StatelessWidget {
     );
   }
 }
-
-
-
