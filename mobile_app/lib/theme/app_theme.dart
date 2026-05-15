@@ -96,7 +96,8 @@ class AppTheme {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: scheme.surface,
+      // Transparent so the app shell can paint surface + ambient behind all routes.
+      scaffoldBackgroundColor: Colors.transparent,
       canvasColor: scheme.surface,
       textTheme: textTheme,
       primaryTextTheme: textTheme,
@@ -107,9 +108,14 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
-        titleTextStyle: textTheme.titleLarge?.copyWith(
+        // Explicit sans + size + weight so the bar title reads as a real heading
+        // (theme [titleLarge] alone can look light with some variable-font merges).
+        titleTextStyle: GoogleFonts.plusJakartaSans(
+          fontSize: 24,
+          fontWeight: FontWeight.w800,
+          height: 1.15,
+          letterSpacing: -0.4,
           color: scheme.onSurface,
-          fontWeight: FontWeight.w700,
         ),
         iconTheme: IconThemeData(color: scheme.onSurface),
         actionsIconTheme: IconThemeData(color: scheme.onSurface),

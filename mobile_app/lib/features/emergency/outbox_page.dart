@@ -13,7 +13,7 @@ class EmergencyOutboxPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Queued Messages')),
       body: ListView.separated(
-        padding: AppConstants.footerPadding,
+        padding: AppConstants.footerScrollInsets(context),
         itemCount: queue.length,
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (BuildContext context, int i) {

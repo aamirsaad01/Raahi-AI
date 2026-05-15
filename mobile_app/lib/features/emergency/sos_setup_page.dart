@@ -52,7 +52,7 @@ class _SosSetupPageState extends State<SosSetupPage> {
           : RefreshIndicator(
               onRefresh: _loadContacts,
               child: ListView(
-                padding: const EdgeInsets.all(16.0).add(AppConstants.footerPadding),
+                padding: EdgeInsets.all(16.0).add(AppConstants.footerScrollInsets(context)),
                 children: <Widget>[
                   Text(
                     'Contacts from your latest itinerary',

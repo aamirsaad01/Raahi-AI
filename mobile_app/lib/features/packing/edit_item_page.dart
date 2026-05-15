@@ -35,7 +35,7 @@ class _PackingEditItemPageState extends State<PackingEditItemPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Item')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16.0).add(AppConstants.footerScrollInsets(context)),
         child: Column(
           children: <Widget>[
             TextField(

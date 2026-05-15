@@ -122,9 +122,7 @@ class _SafePointsPageState extends State<SafePointsPage> {
                 await _loadSafePointsForCity(_selectedCity!);
               },
               child: ListView(
-                padding: const EdgeInsets.all(
-                  16,
-                ).add(AppConstants.footerPadding),
+                padding: EdgeInsets.all(16).add(AppConstants.footerScrollInsets(context)),
                 children: <Widget>[
                       DropdownButtonFormField<String>(
                         initialValue: _selectedCity,

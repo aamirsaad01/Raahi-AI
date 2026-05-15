@@ -72,7 +72,7 @@ class _AiChatHistoryPageState extends State<AiChatHistoryPage> {
           ? const Center(child: CircularProgressIndicator())
           : _conversations.isEmpty
               ? ListView(
-                  padding: const EdgeInsets.all(24).add(AppConstants.footerPadding),
+                  padding: EdgeInsets.all(24).add(AppConstants.footerScrollInsets(context)),
                   children: <Widget>[
                     Text(
                       _hasCurrentItinerary
@@ -92,7 +92,7 @@ class _AiChatHistoryPageState extends State<AiChatHistoryPage> {
                   ],
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
+                  padding: EdgeInsets.all(12).add(AppConstants.footerScrollInsets(context)),
                   itemCount: _conversations.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (BuildContext context, int i) {

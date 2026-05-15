@@ -32,7 +32,7 @@ class PollsPage extends StatelessWidget {
         ],
       ),
       body: ListView.builder(
-        padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(12).add(AppConstants.footerScrollInsets(context)),
         itemCount: polls.length,
         itemBuilder: (BuildContext context, int i) {
           final Poll p = polls[i];

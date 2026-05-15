@@ -30,15 +30,12 @@ class _SplashPageState extends State<SplashPage> {
     final ColorScheme colors = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: colors.primary,
-      body: const Center(
-        child: Text(
-          'Raahi AI',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-            fontSize: 36,
-            letterSpacing: 0.5,
-          ),
+      body: Center(
+        child: Image.asset(
+          'assets/Raahi AI Logo.png',
+          width: 140,
+          height: 140,
+          fit: BoxFit.contain,
         ),
       ),
     );

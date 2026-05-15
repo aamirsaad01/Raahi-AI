@@ -20,7 +20,7 @@ class _AiChatSettingsPageState extends State<AiChatSettingsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Chat Settings')),
       body: ListView(
-        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16).add(AppConstants.footerScrollInsets(context)),
         children: <Widget>[
           Text('Language Preference', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),

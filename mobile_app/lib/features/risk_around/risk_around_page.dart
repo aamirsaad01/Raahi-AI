@@ -132,7 +132,7 @@ class _RiskAroundPageState extends State<RiskAroundPage> {
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
+      padding: EdgeInsets.all(12).add(AppConstants.footerScrollInsets(context)),
       itemCount: _hazards.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (BuildContext context, int i) {

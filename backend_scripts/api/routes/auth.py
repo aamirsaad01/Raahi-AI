@@ -3,11 +3,22 @@
 from flask import Blueprint, request, jsonify
 import sys
 import os
+from datetime import datetime
+from email.utils import parsedate_to_datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from api.user.security import hash_password, verify_password
-from api.user.validators import validate_signup_payload, validate_password_strength
+import psycopg2
+
+from api.user.validators import (
+    CNIC_RE,
+    EMAIL_RE,
+    PHONE_RE,
+    validate_password_strength,
+    validate_signup_payload,
+    _age_years,
+)
 from api.utils.db_helper import DatabaseHelper
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
@@ -17,6 +28,26 @@ def _sanitize_user(user: dict) -> dict:
     user = dict(user)
     user.pop("password", None)
     return user
+
+
+def _parse_dob_for_profile(dob_raw: str):
+    """Accept YYYY-MM-DD, ISO datetimes, or RFC1123-style dates from clients/DB."""
+    dob = str(dob_raw).strip()
+    if not dob:
+        raise ValueError("empty")
+    try:
+        return datetime.strptime(dob, "%Y-%m-%d").date()
+    except ValueError:
+        pass
+    if len(dob) >= 10 and dob[4] == "-" and dob[7] == "-":
+        try:
+            return datetime.strptime(dob[:10], "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    try:
+        return parsedate_to_datetime(dob).date()
+    except (TypeError, ValueError, OverflowError) as e:
+        raise ValueError("unrecognized dob format") from e
 
 
 def _is_admin_request(data: dict) -> tuple[bool, str]:
@@ -131,6 +162,129 @@ def login():
             "user": _sanitize_user(user),
             "message": "Login successful",
         }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Server error: {str(e)}"}), 500
+
+
+@auth_bp.route("/profile", methods=["PUT", "POST"])
+def update_own_profile():
+    """Update the signed-in user's profile (requires current password)."""
+    try:
+        data = request.get_json() or {}
+        email = str(data.get("email", "")).strip().lower()
+        current_password = str(data.get("current_password", ""))
+        if not email or not current_password:
+            return jsonify(
+                {"success": False, "error": "Email and current password are required"}
+            ), 400
+
+        db = DatabaseHelper()
+        try:
+            user = db.get_user_by_email(email)
+            if not user or not verify_password(
+                current_password, str(user.get("password", ""))
+            ):
+                return jsonify({"success": False, "error": "Invalid email or password"}), 401
+
+            uid = int(user["user_id"])
+            patches: dict = {}
+
+            if "name" in data and data["name"] is not None:
+                name = str(data["name"]).strip()
+                if len(name) < 2 or len(name) > 100:
+                    return jsonify(
+                        {"success": False, "error": "Name must be 2–100 characters"}
+                    ), 400
+                patches["name"] = name
+
+            if "contact_number" in data and data["contact_number"] is not None:
+                contact = str(data["contact_number"]).strip()
+                if not PHONE_RE.match(contact):
+                    return jsonify(
+                        {
+                            "success": False,
+                            "error": "Contact number must be 10–15 digits (optional + prefix)",
+                        }
+                    ), 400
+                patches["contact_number"] = contact
+
+            if "dob" in data and data["dob"] is not None:
+                dob = str(data["dob"]).strip()
+                try:
+                    dob_date = _parse_dob_for_profile(dob)
+                except ValueError:
+                    return jsonify(
+                        {
+                            "success": False,
+                            "error": "DOB must be a valid date (use YYYY-MM-DD)",
+                        }
+                    ), 400
+                if _age_years(dob_date) < 13:
+                    return jsonify(
+                        {"success": False, "error": "User must be at least 13 years old"}
+                    ), 400
+                patches["dob"] = dob_date.strftime("%Y-%m-%d")
+
+            if "cnic" in data and data["cnic"] is not None:
+                cnic = str(data["cnic"]).strip()
+                if not CNIC_RE.match(cnic):
+                    return jsonify(
+                        {
+                            "success": False,
+                            "error": "CNIC must match 12345-1234567-1 format",
+                        }
+                    ), 400
+                patches["cnic"] = cnic
+
+            if "medical_conditions" in data:
+                med = str(data.get("medical_conditions", "")).strip()
+                if len(med) > 500:
+                    return jsonify(
+                        {"success": False, "error": "Medical conditions max 500 characters"}
+                    ), 400
+                patches["medical_conditions"] = med
+
+            new_email = str(data.get("new_email", "")).strip().lower()
+            if new_email:
+                if new_email != email:
+                    if not EMAIL_RE.match(new_email):
+                        return jsonify(
+                            {"success": False, "error": "Invalid new email format"}
+                        ), 400
+                    other = db.get_user_by_email(new_email)
+                    if other and int(other["user_id"]) != uid:
+                        return jsonify(
+                            {"success": False, "error": "That email is already in use"}
+                        ), 400
+                    patches["email"] = new_email
+
+            new_password = str(data.get("new_password", "")).strip()
+            if new_password:
+                pwd_err = validate_password_strength(new_password)
+                if pwd_err:
+                    return jsonify({"success": False, "error": pwd_err}), 400
+                patches["password"] = hash_password(new_password)
+
+            if not patches:
+                fresh = db.get_user_by_id(uid)
+                return jsonify(
+                    {"success": True, "user": _sanitize_user(fresh or user)}
+                ), 200
+
+            try:
+                updated = db.update_user_profile_by_admin(uid, patches)
+            except psycopg2.errors.UniqueViolation:
+                return jsonify(
+                    {"success": False, "error": "Email or CNIC already exists"}
+                ), 400
+
+            fresh = db.get_user_by_id(uid)
+            if not updated or not fresh:
+                return jsonify({"success": False, "error": "Update failed"}), 400
+
+            return jsonify({"success": True, "user": _sanitize_user(fresh)}), 200
+        finally:
+            db.close()
     except Exception as e:
         return jsonify({"success": False, "error": f"Server error: {str(e)}"}), 500
 

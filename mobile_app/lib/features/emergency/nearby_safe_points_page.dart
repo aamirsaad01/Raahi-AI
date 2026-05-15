@@ -124,9 +124,7 @@ class _NearbySafePointsPageState extends State<NearbySafePointsPage> {
           : RefreshIndicator(
               onRefresh: _loadNearby,
               child: ListView(
-                padding: const EdgeInsets.all(
-                  16,
-                ).add(AppConstants.footerPadding),
+                padding: EdgeInsets.all(16).add(AppConstants.footerScrollInsets(context)),
                 children: <Widget>[
                   if (_lat != null && _lon != null)
                     Text(

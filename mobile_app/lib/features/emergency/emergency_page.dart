@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -188,7 +190,7 @@ class _EmergencyPageState extends State<EmergencyPage> {
             const SizedBox(height: 10),
             Expanded(
               child: GridView.builder(
-                padding: AppConstants.footerPadding,
+                padding: AppConstants.footerScrollInsets(context),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
@@ -197,30 +199,165 @@ class _EmergencyPageState extends State<EmergencyPage> {
                 ),
                 itemCount: cards.length,
                 itemBuilder: (BuildContext context, int i) {
-                  final _CardLink c = cards[i];
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => Navigator.of(context).pushNamed(c.route),
-                    child: Ink(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          Icon(c.icon, size: 36, color: Theme.of(context).colorScheme.primary),
-                          const SizedBox(height: 12),
-                          Text(c.title, textAlign: TextAlign.center),
-                        ],
-                      ),
-                    ),
-                  );
+                  return _EmergencyGlassTile(link: cards[i]);
                 },
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Same frosted-glass + teal rim treatment as homepage feature tiles.
+class _EmergencyGlassTile extends StatelessWidget {
+  final _CardLink link;
+
+  const _EmergencyGlassTile({required this.link});
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme colors = theme.colorScheme;
+    final TextTheme text = theme.textTheme;
+    final bool isDark = theme.brightness == Brightness.dark;
+    final BorderRadius borderRadius = BorderRadius.circular(20);
+
+    final List<Color> glassFill = <Color>[
+      Colors.white.withValues(alpha: isDark ? 0.055 : 0.16),
+      Colors.white.withValues(alpha: isDark ? 0.02 : 0.06),
+    ];
+    final Color glassHighlight =
+        Colors.white.withValues(alpha: isDark ? 0.07 : 0.22);
+    final Color tileOutline =
+        colors.primary.withValues(alpha: isDark ? 0.58 : 0.72);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: isDark ? 0.35 : 0.12),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+            spreadRadius: -6,
+          ),
+        ],
+      ),
+      child: RepaintBoundary(
+        child: ClipRRect(
+          borderRadius: borderRadius,
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: glassFill,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: Container(
+                    height: 1,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: <Color>[
+                          glassHighlight.withValues(alpha: 0),
+                          glassHighlight,
+                          glassHighlight.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: borderRadius,
+                  splashColor: colors.primary.withValues(alpha: 0.12),
+                  highlightColor: colors.onSurface.withValues(alpha: 0.05),
+                  onTap: () {
+                    Navigator.of(context).pushNamed(link.route);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: <Color>[
+                                colors.primary.withValues(alpha: 0.12),
+                                colors.primary.withValues(alpha: 0.055),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.white.withValues(
+                                alpha: isDark ? 0.16 : 0.36,
+                              ),
+                              width: 1,
+                            ),
+                          ),
+                          child: SizedBox(
+                            width: 52,
+                            height: 52,
+                            child: Center(
+                              child: Icon(
+                                link.icon,
+                                size: 28,
+                                color: colors.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          link.title,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: borderRadius,
+                      border: Border.all(color: tileOutline, width: 1),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

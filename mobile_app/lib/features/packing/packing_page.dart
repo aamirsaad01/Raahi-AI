@@ -42,7 +42,7 @@ class _PackingFormPageState extends State<PackingFormPage> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16).add(AppConstants.footerScrollInsets(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[

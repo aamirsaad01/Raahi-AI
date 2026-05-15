@@ -158,7 +158,7 @@ class _ReportHazardPageState extends State<ReportHazardPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Report Hazard')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16.0).add(AppConstants.footerScrollInsets(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[

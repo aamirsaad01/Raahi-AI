@@ -66,7 +66,7 @@ class ChatRoomPage extends StatelessWidget {
             ),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
+              padding: EdgeInsets.all(12).add(AppConstants.footerScrollInsets(context)),
               itemCount: messages.length,
               itemBuilder: (BuildContext context, int i) {
                 final ChatMessage m = messages[i];

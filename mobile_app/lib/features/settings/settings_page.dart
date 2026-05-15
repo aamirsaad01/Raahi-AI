@@ -123,33 +123,61 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
               _SectionLabel(text: 'Account'),
               const SizedBox(height: 10),
               _SettingsCard(
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 6,
-                  ),
-                  leading: _IconBubble(
-                    icon: Icons.logout_rounded,
-                    tone: colors.error,
-                  ),
-                  title: Text(
-                    'Log out',
-                    style: text.titleMedium?.copyWith(color: colors.error),
-                  ),
-                  subtitle: Text(
-                    'Sign out of this device.',
-                    style: text.bodySmall?.copyWith(
-                      color: colors.onSurface.withValues(alpha: 0.7),
+                child: Column(
+                  children: <Widget>[
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
+                      leading: _IconBubble(icon: Icons.person_outline_rounded),
+                      title: Text(
+                        'Personal information',
+                        style: text.titleMedium,
+                      ),
+                      subtitle: Text(
+                        'Name, contact, DOB, CNIC, and related details from signup.',
+                        style: text.bodySmall?.copyWith(
+                          color: colors.onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: colors.onSurface.withValues(alpha: 0.6),
+                      ),
+                      onTap: () => Navigator.of(context)
+                          .pushNamed(AppRoutes.appSettingsEditProfile),
                     ),
-                  ),
-                  trailing: Icon(
-                    Icons.chevron_right_rounded,
-                    color: colors.onSurface.withValues(alpha: 0.6),
-                  ),
-                  onTap: _logout,
+                    Divider(height: 1, color: colors.outlineVariant),
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
+                      leading: _IconBubble(
+                        icon: Icons.logout_rounded,
+                        tone: colors.error,
+                      ),
+                      title: Text(
+                        'Log out',
+                        style: text.titleMedium?.copyWith(color: colors.error),
+                      ),
+                      subtitle: Text(
+                        'Sign out of this device.',
+                        style: text.bodySmall?.copyWith(
+                          color: colors.onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: colors.onSurface.withValues(alpha: 0.6),
+                      ),
+                      onTap: _logout,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
               Center(
                 child: Text(
                   'Raahi AI · v1.0',

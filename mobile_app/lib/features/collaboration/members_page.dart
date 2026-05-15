@@ -15,7 +15,7 @@ class MembersPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Members')),
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 60),
+        padding: EdgeInsets.only(bottom: AppConstants.footerOverlayBottomPadding(context)),
         child: FloatingActionButton.extended(
           onPressed: () {
             // Show dialog to add member by username
@@ -58,7 +58,7 @@ class MembersPage extends StatelessWidget {
         ),
       ),
       body: ListView.builder(
-        padding: AppConstants.footerPadding,
+        padding: AppConstants.footerScrollInsets(context),
         itemCount: members.length,
         itemBuilder: (BuildContext context, int i) {
           final GroupMember m = members[i];

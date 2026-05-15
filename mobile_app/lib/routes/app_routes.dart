@@ -42,6 +42,7 @@ import '../features/auth/signup_page.dart';
 import '../features/auth/admin_users_page.dart';
 import '../features/risk_around/risk_around_page.dart';
 import '../features/settings/settings_page.dart';
+import '../features/settings/edit_profile_page.dart';
 
 class AppRoutes {
   const AppRoutes._();
@@ -87,6 +88,7 @@ class AppRoutes {
   static const String packingEdit = '/packing/edit';
   static const String packingSaved = '/packing/saved';
   static const String appSettings = '/settings';
+  static const String appSettingsEditProfile = '/settings/profile';
 
   static Map<String, WidgetBuilder> routes() {
     return <String, WidgetBuilder>{
@@ -158,6 +160,7 @@ class AppRoutes {
       aiChatHistory: (BuildContext context) => const AiChatHistoryPage(),
       aiChatSettings: (BuildContext context) => const AiChatSettingsPage(),
       appSettings: (BuildContext context) => const AppSettingsPage(),
+      appSettingsEditProfile: (BuildContext context) => const EditProfilePage(),
     };
   }
 
@@ -167,15 +170,39 @@ class AppRoutes {
     if (builder == null) return null;
     return PageRouteBuilder<dynamic>(
       settings: settings,
-      pageBuilder: (BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) => builder(context),
-      transitionDuration: const Duration(milliseconds: 220),
+      opaque: true,
+      barrierColor: Colors.transparent,
+      pageBuilder:
+          (BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) =>
+              builder(context),
+      transitionDuration: const Duration(milliseconds: 240),
       reverseTransitionDuration: const Duration(milliseconds: 200),
-      transitionsBuilder: (BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) {
-        final Animation<double> fade = CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic);
-        final Animation<double> scale = Tween<double>(begin: 0.98, end: 1.0).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+      transitionsBuilder:
+          (BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) {
+        // Cross-fade with a tiny slide — keeps transitions smooth WITHOUT
+        // painting an opaque rectangle that would hide the ambient
+        // background layer rendered by the app shell.
+        final Animation<double> inCurve = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final Animation<double> outCurve = CurvedAnimation(
+          parent: secondaryAnimation,
+          curve: Curves.easeInCubic,
+        );
         return FadeTransition(
-          opacity: fade,
-          child: ScaleTransition(scale: scale, child: child),
+          opacity: inCurve,
+          child: FadeTransition(
+            opacity: Tween<double>(begin: 1.0, end: 0.0).animate(outCurve),
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.04, 0),
+                end: Offset.zero,
+              ).animate(inCurve),
+              child: child,
+            ),
+          ),
         );
       },
     );

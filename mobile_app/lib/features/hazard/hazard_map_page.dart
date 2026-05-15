@@ -147,7 +147,7 @@ class _HazardMapPageState extends State<HazardMapPage> {
         ],
       ),
       floatingActionButton: SafeArea(
-        minimum: const EdgeInsets.only(bottom: 60),
+        minimum: EdgeInsets.only(bottom: AppConstants.footerOverlayBottomPadding(context)),
         child: FloatingActionButton.extended(
           onPressed: () async {
             final result = await Navigator.of(context).pushNamed(AppRoutes.hazardReport);
@@ -247,7 +247,7 @@ class _HazardMapPageState extends State<HazardMapPage> {
     return RefreshIndicator(
       onRefresh: () => _loadHazards(refreshFromSource: true),
       child: ListView.separated(
-        padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(12).add(AppConstants.footerScrollInsets(context)),
         itemCount: _hazards.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (BuildContext context, int i) {

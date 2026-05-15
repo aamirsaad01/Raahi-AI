@@ -138,7 +138,7 @@ class _MyReportsPageState extends State<MyReportsPage> {
     return RefreshIndicator(
       onRefresh: _loadReports,
       child: ListView.separated(
-        padding: AppConstants.footerPadding,
+        padding: AppConstants.footerScrollInsets(context),
         itemCount: _reports.length,
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (BuildContext context, int i) {

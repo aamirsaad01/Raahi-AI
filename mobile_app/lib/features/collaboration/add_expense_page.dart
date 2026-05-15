@@ -28,7 +28,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Add Expense')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16.0).add(AppConstants.footerScrollInsets(context)),
         child: Column(
           children: <Widget>[
             TextField(

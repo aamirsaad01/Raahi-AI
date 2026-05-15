@@ -18,7 +18,7 @@ class _EmergencySettingsPageState extends State<EmergencySettingsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Emergency Settings')),
       body: ListView(
-        padding: AppConstants.footerPadding,
+        padding: AppConstants.footerScrollInsets(context),
         children: <Widget>[
           SwitchListTile(
             value: autoSwitch,

@@ -21,7 +21,7 @@ class PhotosPage extends StatelessWidget {
         ],
       ),
       body: GridView.builder(
-        padding: const EdgeInsets.all(8).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(8).add(AppConstants.footerScrollInsets(context)),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
           crossAxisSpacing: 4,

@@ -151,7 +151,7 @@ class _DestinationSelectionPageState extends State<DestinationSelectionPage> {
         title: const Text('Choose Destination'),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16).add(AppConstants.footerScrollInsets(context)),
         children: [
           Text(
             'Select a destination to generate your itinerary',

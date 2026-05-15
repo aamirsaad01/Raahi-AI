@@ -29,7 +29,7 @@ class _CreateJoinGroupPageState extends State<CreateJoinGroupPage> {
     return Scaffold(
       appBar: AppBar(title: Text(widget.isCreating ? 'Create Group' : 'Join Group')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16.0).add(AppConstants.footerScrollInsets(context)),
         child: Column(
           children: <Widget>[
             if (widget.isCreating) ...<Widget>[

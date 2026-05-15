@@ -92,7 +92,7 @@ class _ItineraryResultsPageState extends State<ItineraryResultsPage> {
       return Scaffold(
         appBar: AppBar(title: const Text('Generating Itinerary')),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
+          padding: EdgeInsets.all(16).add(AppConstants.footerScrollInsets(context)),
           child: Column(
             children: [
               const SizedBox(height: 10),
@@ -193,7 +193,7 @@ class _ItineraryResultsPageState extends State<ItineraryResultsPage> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16).add(AppConstants.footerScrollInsets(context)),
         children: [
           _OverviewHeader(itinerary: itin),
           const SizedBox(height: 20),

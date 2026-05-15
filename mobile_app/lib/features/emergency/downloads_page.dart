@@ -28,7 +28,7 @@ class _EmergencyDownloadsPageState extends State<EmergencyDownloadsPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Offline Downloads')),
       body: ListView(
-        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16).add(AppConstants.footerScrollInsets(context)),
         children: <Widget>[
           _Tile(title: 'Northern Region Tiles', progress: 0.7),
           _Tile(title: 'Safe Points POIs', progress: 1.0),

@@ -181,7 +181,7 @@ class _AiChatPageState extends State<AiChatPage> {
         children: <Widget>[
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
+              padding: EdgeInsets.all(12).add(AppConstants.footerScrollInsets(context)),
               itemCount: _messages.length,
               itemBuilder: (BuildContext context, int index) {
                 final AiChatMessage message = _messages[index];
@@ -189,35 +189,42 @@ class _AiChatPageState extends State<AiChatPage> {
               },
             ),
           ),
+          // Bottom inset is only in [footerOverlayBottomPadding] — do not wrap with
+          // default bottom [SafeArea] or system padding is applied twice.
           SafeArea(
             top: false,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-              margin: const EdgeInsets.only(bottom: 60),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: AppConstants.footerOverlayBottomPadding(context),
               ),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: const InputDecoration(
-                        hintText: 'Sawal poochhein... (Ask in Urdu/Roman Urdu/English)',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: TextField(
+                        controller: _messageController,
+                        decoration: const InputDecoration(
+                          hintText: 'Sawal poochhein... (Ask in Urdu/Roman Urdu/English)',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        maxLines: null,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _sendMessage(),
                       ),
-                      maxLines: null,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: _sending ? null : _sendMessage,
-                    icon: const Icon(Icons.send_rounded),
-                  ),
-                ],
+                    IconButton(
+                      onPressed: _sending ? null : _sendMessage,
+                      icon: const Icon(Icons.send_rounded),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

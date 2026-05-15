@@ -1235,7 +1235,8 @@ def home():
         'endpoints': {
             'auth': {
                 'register': 'POST /api/auth/register',
-                'login': 'POST /api/auth/login'
+                'login': 'POST /api/auth/login',
+                'profile_update': 'PUT or POST /api/auth/profile',
             },
             'itinerary': {
                 'recommend': 'POST /api/itinerary/recommend',

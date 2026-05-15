@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../routes/app_routes.dart';
 
-enum FooterTab { home, itinerary, packing, hazards, emergency, chat, ai }
+/// Tabs surfaced on the floating bottom nav.
+enum FooterTab { home, itinerary, packing, hazards, emergency, ai }
 
+/// Floating pill-shaped bottom navigation.
+///
+/// Sits above the page content with horizontal + bottom margins. Teal bar in
+/// light mode with a white circle for the active tab; dark mode uses a dark
+/// pill with primary circle for the active tab. Flat (no drop shadow) so it
+/// does not cast a shadow onto the page above.
 class AppFooterNav extends StatelessWidget {
   final FooterTab? current;
   final void Function(FooterTab tab)? onTap;
@@ -11,8 +19,11 @@ class AppFooterNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme colors = Theme.of(context).colorScheme;
-    final List<_FooterItem> items = <_FooterItem>[
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme colors = theme.colorScheme;
+    final bool isDark = theme.brightness == Brightness.dark;
+
+    final List<_FooterItem> items = const <_FooterItem>[
       _FooterItem(
         tab: FooterTab.home,
         icon: Icons.home_rounded,
@@ -21,7 +32,7 @@ class AppFooterNav extends StatelessWidget {
       ),
       _FooterItem(
         tab: FooterTab.itinerary,
-        icon: Icons.auto_awesome,
+        icon: Icons.auto_awesome_rounded,
         label: 'Itinerary',
         route: AppRoutes.itinerary,
       ),
@@ -44,12 +55,6 @@ class AppFooterNav extends StatelessWidget {
         route: AppRoutes.emergency,
       ),
       _FooterItem(
-        tab: FooterTab.chat,
-        icon: Icons.groups_rounded,
-        label: 'Collaboration',
-        route: AppRoutes.collaboration,
-      ),
-      _FooterItem(
         tab: FooterTab.ai,
         icon: Icons.smart_toy_rounded,
         label: 'AI Chat',
@@ -57,21 +62,47 @@ class AppFooterNav extends StatelessWidget {
       ),
     ];
 
-    return Material(
-      color: colors.primary,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: items
-                .map(( _FooterItem item ) => _FooterButton(
-                      item: item,
-                      isActive: current == item.tab,
-                      onTap: onTap, // pass parent onTap!
-                    ))
-                .toList(),
+    // Teal pill, white pill in dark mode flips to a subtle dark surface so
+    // the bar does not glow.
+    final Color barColor = isDark ? colors.surfaceContainerHighest : colors.primary;
+    final Color borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.18);
+
+    final ShapeBorder pillShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(999),
+      side: BorderSide(color: borderColor, width: 1),
+    );
+
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+        child: Material(
+          color: barColor,
+          // No drop shadow — kept as a flat pill so it does not visually
+          // bleed onto the page above (e.g. on form screens).
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          shape: pillShape,
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(
+            height: 64,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: items
+                    .map((_FooterItem item) => _FooterButton(
+                          item: item,
+                          isActive: current == item.tab,
+                          onTap: onTap,
+                        ))
+                    .toList(),
+              ),
+            ),
           ),
         ),
       ),
@@ -85,50 +116,84 @@ class _FooterItem {
   final String label;
   final String route;
 
-  const _FooterItem({required this.tab, required this.icon, required this.label, required this.route});
+  const _FooterItem({
+    required this.tab,
+    required this.icon,
+    required this.label,
+    required this.route,
+  });
 }
 
 class _FooterButton extends StatelessWidget {
   final _FooterItem item;
   final bool isActive;
-  final void Function(FooterTab tab)? onTap; // add this field
+  final void Function(FooterTab tab)? onTap;
 
-  const _FooterButton({required this.item, required this.isActive, this.onTap}); // update constructor
+  const _FooterButton({
+    required this.item,
+    required this.isActive,
+    this.onTap,
+  });
+
+  void _handleTap(BuildContext context) {
+    HapticFeedback.selectionClick();
+    if (isActive) return;
+    if (onTap != null) {
+      onTap!(item.tab);
+      return;
+    }
+    if (item.tab == FooterTab.home) {
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        item.route,
+        (Route<dynamic> r) => false,
+      );
+    } else {
+      Navigator.of(context).pushNamed(item.route);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final ColorScheme colors = Theme.of(context).colorScheme;
-    final Color bg = isActive ? colors.onPrimary : Colors.transparent;
-    final Color fg = isActive
-        ? colors.primary
-        : colors.onPrimary.withValues(alpha: 0.85);
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: () {
-          if (isActive) return;
-          if (onTap != null) {
-            onTap!(item.tab);
-            return;
-          }
-          if (item.tab == FooterTab.home) {
-            Navigator.of(context).pushNamedAndRemoveUntil(item.route, (Route<dynamic> r) => false);
-          } else {
-            Navigator.of(context).pushNamed(item.route);
-          }
-        },
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Light: teal pill → white circle for active, teal icon inside.
+    // Dark : dark pill → primary circle for active, white icon inside.
+    final Color activeBg = isDark ? colors.primary : colors.onPrimary;
+    final Color activeFg = isDark ? colors.onPrimary : colors.primary;
+    final Color inactiveFg = isDark
+        ? colors.onSurface.withValues(alpha: 0.62)
+        : colors.onPrimary.withValues(alpha: 0.78);
+
+    return Semantics(
+      label: item.label,
+      button: true,
+      selected: isActive,
+      child: InkResponse(
+        onTap: () => _handleTap(context),
+        radius: 28,
+        highlightShape: BoxShape.circle,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(24),
+            color: isActive ? activeBg : Colors.transparent,
+            shape: BoxShape.circle,
           ),
-          child: Icon(item.icon, color: fg, size: 20),
+          alignment: Alignment.center,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: Icon(
+              item.icon,
+              key: ValueKey<bool>(isActive),
+              size: 22,
+              color: isActive ? activeFg : inactiveFg,
+            ),
+          ),
         ),
       ),
     );
   }
 }
-
-

@@ -13,7 +13,7 @@ class DayDetailPage extends StatelessWidget {
         title: Text(day.displayHeading),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16).add(AppConstants.footerScrollInsets(context)),
         children: [
           if (day.daySummary.isNotEmpty) ...[
             Card(

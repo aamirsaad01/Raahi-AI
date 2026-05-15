@@ -28,7 +28,7 @@ class _CreatePollPageState extends State<CreatePollPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Create Poll')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16.0).add(AppConstants.footerScrollInsets(context)),
         child: Column(
           children: <Widget>[
             TextField(

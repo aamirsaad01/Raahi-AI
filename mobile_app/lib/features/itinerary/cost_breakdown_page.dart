@@ -15,7 +15,7 @@ class CostBreakdownPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Cost Breakdown')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16).add(AppConstants.footerScrollInsets(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

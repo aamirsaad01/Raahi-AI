@@ -14,7 +14,7 @@ class PoiDetailPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(slot.locationName)),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(16).add(AppConstants.footerScrollInsets(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

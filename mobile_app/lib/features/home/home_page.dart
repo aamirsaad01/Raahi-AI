@@ -1,6 +1,8 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../routes/app_routes.dart';
 import '../auth/auth_session.dart';
@@ -13,19 +15,55 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   AuthUser? _user;
+  int _refreshEpoch = 0;
+
+  late final AnimationController _idleController;
 
   @override
   void initState() {
     super.initState();
+    _idleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    )..repeat(reverse: true);
+
     _loadUser();
+  }
+
+  @override
+  void dispose() {
+    _idleController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUser() async {
     final AuthUser? user = await AuthSession.load();
     if (!mounted) return;
     setState(() => _user = user);
+  }
+
+  Future<void> _onPullRefresh() async {
+    await _loadUser();
+    if (!mounted) return;
+    setState(() => _refreshEpoch++);
+    await Future<void>.delayed(const Duration(milliseconds: 280));
+  }
+
+  /// Time-of-day + slight per-tile variation for “state” icons.
+  Color _themedIconColor(ColorScheme scheme, int hour, int tileIndex) {
+    final double dayBlend = switch (hour) {
+      < 5 => 0.38,
+      >= 21 => 0.38,
+      < 12 => 0.1,
+      < 17 => 0.2,
+      _ => 0.28,
+    };
+    final Color base =
+        Color.lerp(scheme.primary, scheme.secondary, dayBlend)!;
+    final double nudge = (tileIndex % 3) * 0.04;
+    return Color.lerp(base, scheme.tertiary, nudge) ?? base;
   }
 
   String _greeting() {
@@ -48,58 +86,65 @@ class _HomePageState extends State<HomePage> {
     final ThemeData theme = Theme.of(context);
     final TextTheme text = theme.textTheme;
     final ColorScheme colors = theme.colorScheme;
+    final int hour = DateTime.now().hour;
 
     final List<_HomeAction> actions = <_HomeAction>[
       const _HomeAction(
         title: 'Mood Itinerary',
         subtitle: 'Plan by feeling',
-        icon: Icons.auto_awesome,
+        icon: Icons.auto_awesome_rounded,
+        hoverIcon: Icons.explore_rounded,
         route: AppRoutes.itinerary,
       ),
       const _HomeAction(
         title: 'Packing Checklist',
         subtitle: 'Smart, tailored lists',
         icon: Icons.checklist_rounded,
+        hoverIcon: Icons.luggage_rounded,
         route: AppRoutes.packing,
       ),
       const _HomeAction(
         title: 'Hazard Map',
         subtitle: 'Live alerts near you',
         icon: Icons.warning_amber_rounded,
+        hoverIcon: Icons.shield_rounded,
         route: AppRoutes.hazardMap,
       ),
       const _HomeAction(
         title: 'Risk Around Me',
         subtitle: 'Scan my surroundings',
         icon: Icons.radar_rounded,
+        hoverIcon: Icons.near_me_rounded,
         route: AppRoutes.riskAround,
       ),
       const _HomeAction(
         title: 'Emergency Mode',
         subtitle: 'Offline-first SOS',
         icon: Icons.sos_rounded,
+        hoverIcon: Icons.medical_services_rounded,
         route: AppRoutes.emergency,
       ),
       const _HomeAction(
         title: 'AI Chat',
         subtitle: 'Ask Raahi anything',
         icon: Icons.smart_toy_rounded,
+        hoverIcon: Icons.chat_bubble_rounded,
         route: AppRoutes.aiChat,
-      ),
-      const _HomeAction(
-        title: 'Collaboration',
-        subtitle: 'Plan with friends',
-        icon: Icons.groups_rounded,
-        route: AppRoutes.collaboration,
       ),
     ];
 
     return Scaffold(
-      backgroundColor: colors.surface,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: <Widget>[
+        child: RefreshIndicator(
+          color: colors.primary,
+          edgeOffset: 10,
+          onRefresh: _onPullRefresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            slivers: <Widget>[
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -112,9 +157,9 @@ class _HomePageState extends State<HomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            'RAAHI',
+                            'Raahi AI',
                             style: text.titleMedium?.copyWith(
-                              letterSpacing: 4,
+                              letterSpacing: 1.2,
                               color: colors.onSurface,
                               fontWeight: FontWeight.w800,
                             ),
@@ -222,8 +267,14 @@ class _HomePageState extends State<HomePage> {
                 delegate: SliverChildBuilderDelegate(
                   (BuildContext context, int index) {
                     return _ActionCard(
+                      key: ValueKey<String>(
+                        '${actions[index].route}_$_refreshEpoch',
+                      ),
                       action: actions[index],
                       index: index,
+                      idleController: _idleController,
+                      themedIconColor:
+                          _themedIconColor(colors, hour, index),
                     );
                   },
                   childCount: actions.length,
@@ -233,6 +284,7 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
+    ),
     );
   }
 }
@@ -248,7 +300,7 @@ class _BrandMark extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: Image.asset(
-          'assets/raahi_logo.png',
+          'assets/Raahi AI Logo.png',
           fit: BoxFit.cover,
         ),
       ),
@@ -492,12 +544,15 @@ class _HomeAction {
   final String title;
   final String subtitle;
   final IconData icon;
+  /// Shown when the pointer hovers the icon chip (desktop / mouse).
+  final IconData hoverIcon;
   final String route;
 
   const _HomeAction({
     required this.title,
     required this.subtitle,
     required this.icon,
+    required this.hoverIcon,
     required this.route,
   });
 }
@@ -505,10 +560,15 @@ class _HomeAction {
 class _ActionCard extends StatefulWidget {
   final _HomeAction action;
   final int index;
+  final AnimationController idleController;
+  final Color themedIconColor;
 
   const _ActionCard({
+    super.key,
     required this.action,
     required this.index,
+    required this.idleController,
+    required this.themedIconColor,
   });
 
   @override
@@ -519,6 +579,7 @@ class _ActionCardState extends State<_ActionCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _pressController;
   late Animation<double> _pressScale;
+  bool _pressed = false;
 
   @override
   void initState() {
@@ -545,48 +606,169 @@ class _ActionCardState extends State<_ActionCard>
     final TextTheme text = theme.textTheme;
     final _HomeAction action = widget.action;
 
-    final Widget tile = InkWell(
-      borderRadius: BorderRadius.circular(20),
-      onTapDown: (_) => _pressController.forward(),
-      onTapUp: (_) => _pressController.reverse(),
-      onTapCancel: () => _pressController.reverse(),
-      onTap: () => Navigator.of(context).pushNamed(action.route),
-      child: Ink(
-        decoration: BoxDecoration(
-          color: colors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colors.outlineVariant),
+    final bool isDark = theme.brightness == Brightness.dark;
+    final BorderRadius tileRadius = BorderRadius.circular(20);
+
+    // Frosted glass — keep veil light so [TravelAmbientBackground] motion reads through.
+    final List<Color> glassFill = <Color>[
+      Colors.white.withValues(alpha: isDark ? 0.055 : 0.16),
+      Colors.white.withValues(alpha: isDark ? 0.02 : 0.06),
+    ];
+    final Color glassHighlight = Colors.white.withValues(alpha: isDark ? 0.07 : 0.22);
+    final Color tileOutline = colors.primary.withValues(alpha: isDark ? 0.58 : 0.72);
+
+    final Widget iconChip = SizedBox(
+      width: 54,
+      height: 54,
+      child: Center(
+        child: Icon(
+          _pressed ? action.hoverIcon : action.icon,
+          color: widget.themedIconColor,
+          size: 30,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+    );
+
+    final Widget tile = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: tileRadius,
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: isDark ? 0.35 : 0.12),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+            spreadRadius: -6,
+          ),
+        ],
+      ),
+      child: RepaintBoundary(
+        child: ClipRRect(
+          borderRadius: tileRadius,
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.expand,
             children: <Widget>[
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                alignment: Alignment.center,
-                child: Icon(action.icon, color: colors.primary, size: 22),
-              ),
-              const Spacer(),
-              Text(
-                action.title,
-                style: text.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  height: 1.15,
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: glassFill,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                action.subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: text.bodySmall?.copyWith(
-                  color: colors.onSurface.withValues(alpha: 0.65),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: Container(
+                    height: 1,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: <Color>[
+                          glassHighlight.withValues(alpha: 0),
+                          glassHighlight,
+                          glassHighlight.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: tileRadius,
+                  splashColor: colors.primary.withValues(alpha: 0.12),
+                  highlightColor: colors.onSurface.withValues(alpha: 0.05),
+                  onTapDown: (_) {
+                    HapticFeedback.lightImpact();
+                    setState(() => _pressed = true);
+                    _pressController.forward();
+                  },
+                  onTapUp: (_) {
+                    setState(() => _pressed = false);
+                    _pressController.reverse();
+                    HapticFeedback.selectionClick();
+                  },
+                  onTapCancel: () {
+                    setState(() => _pressed = false);
+                    _pressController.reverse();
+                  },
+                  onTap: () => Navigator.of(context).pushNamed(action.route),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: <Color>[
+                                widget.themedIconColor.withValues(
+                                  alpha: _pressed ? 0.16 : 0.10,
+                                ),
+                                widget.themedIconColor.withValues(
+                                  alpha: _pressed ? 0.08 : 0.045,
+                                ),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.white.withValues(
+                                alpha: isDark ? 0.16 : 0.36,
+                              ),
+                              width: 1,
+                            ),
+                          ),
+                          child: iconChip,
+                        ),
+                        const Spacer(),
+                        Text(
+                          action.title,
+                          style: text.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            height: 1.15,
+                            shadows: <Shadow>[
+                              Shadow(
+                                color: colors.shadow.withValues(alpha: 0.12),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          action.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.bodySmall?.copyWith(
+                            color: colors.onSurface.withValues(alpha: 0.78),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Primary (teal) stroke inside the clip so it tracks transforms and
+              // avoids subpixel shimmer vs an outer [DecoratedBox] border.
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: tileRadius,
+                      border: Border.all(color: tileOutline, width: 1),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -595,26 +777,42 @@ class _ActionCardState extends State<_ActionCard>
       ),
     );
 
-    return ScaleTransition(
-      scale: _pressScale,
-      child: tile
-          .animate(delay: (42 * widget.index).ms)
-          .fadeIn(
-            duration: 400.ms,
-            curve: Curves.easeOutCubic,
-          )
-          .slideY(
-            begin: 0.06,
-            end: 0,
-            duration: 400.ms,
-            curve: Curves.easeOutCubic,
-          )
-          .scale(
-            begin: const Offset(0.94, 0.94),
-            end: const Offset(1, 1),
-            duration: 400.ms,
-            curve: Curves.easeOutCubic,
-          ),
+    final Widget animatedTile = tile
+        .animate(delay: (42 * widget.index).ms)
+        .fadeIn(
+          duration: 400.ms,
+          curve: Curves.easeOutCubic,
+        )
+        .slideY(
+          begin: 0.06,
+          end: 0,
+          duration: 400.ms,
+          curve: Curves.easeOutCubic,
+        )
+        .scale(
+          begin: const Offset(0.94, 0.94),
+          end: const Offset(1, 1),
+          duration: 400.ms,
+          curve: Curves.easeOutCubic,
+        );
+
+    return AnimatedBuilder(
+      animation: Listenable.merge(<Listenable>[
+        widget.idleController,
+        _pressController,
+      ]),
+      builder: (BuildContext context, Widget? child) {
+        final double phase =
+            widget.idleController.value * math.pi * 2 + widget.index * 0.55;
+        final double idleScale =
+            1.0 + 0.0075 * math.sin(phase);
+        final double combined = idleScale * _pressScale.value;
+        return Transform.scale(
+          scale: combined,
+          child: child,
+        );
+      },
+      child: animatedTile,
     );
   }
 }

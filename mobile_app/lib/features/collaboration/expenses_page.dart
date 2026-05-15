@@ -38,7 +38,7 @@ class ExpensesPage extends StatelessWidget {
         children: <Widget>[
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
+              padding: EdgeInsets.all(12).add(AppConstants.footerScrollInsets(context)),
               itemCount: expenses.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (BuildContext context, int i) {

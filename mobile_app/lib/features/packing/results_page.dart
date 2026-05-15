@@ -100,7 +100,7 @@ class _PackingResultsPageState extends State<PackingResultsPage> {
                     if (metadata != null) _MetadataHeader(metadata: metadata!),
                     Expanded(
                       child: ListView.builder(
-                        padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
+                        padding: EdgeInsets.all(12).add(AppConstants.footerScrollInsets(context)),
                         itemCount: sections.length,
                         itemBuilder: (BuildContext context, int index) {
                           final PackingSection section = sections[index];

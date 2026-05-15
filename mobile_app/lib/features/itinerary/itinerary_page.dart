@@ -36,7 +36,7 @@ class _ItineraryFormPageState extends State<ItineraryFormPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Mood-to-Itinerary')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16).add(AppConstants.footerPadding),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16).add(AppConstants.footerScrollInsets(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -106,6 +106,11 @@ class _ItineraryFormPageState extends State<ItineraryFormPage> {
               width: double.infinity,
               height: 50, // Fixed height for better visibility
               child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                  surfaceTintColor: Colors.transparent,
+                ),
                 onPressed: _budget.text.trim().isEmpty ? null : () {
                   final budgetValue = int.tryParse(_budget.text.trim());
                   if (budgetValue == null || budgetValue <= 0) {

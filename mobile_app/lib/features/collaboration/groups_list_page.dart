@@ -21,7 +21,7 @@ class GroupsListPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Collaboration Suite')),
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 60),
+        padding: EdgeInsets.only(bottom: AppConstants.footerOverlayBottomPadding(context)),
         child: FloatingActionButton.extended(
           onPressed: () => Navigator.of(context).pushNamed(AppRoutes.collaborationCreate),
           icon: const Icon(Icons.add_rounded),
@@ -29,7 +29,7 @@ class GroupsListPage extends StatelessWidget {
         ),
       ),
       body: ListView.separated(
-        padding: const EdgeInsets.all(12).add(AppConstants.footerPadding),
+        padding: EdgeInsets.all(12).add(AppConstants.footerScrollInsets(context)),
         itemCount: groups.length + 1,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (BuildContext context, int i) {
